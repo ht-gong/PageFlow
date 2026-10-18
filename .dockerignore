@@ -1,0 +1,58 @@
+# Keep the build context to the ~5 MB of tracked source.  Everything here is
+# either regenerated inside the image (build/, TQPlib/*.so), host-specific
+# (.venv, .vscode), or data that belongs in a mounted volume (data/, out/).
+.git
+.gitignore
+.gitmodules
+.github
+
+**/__pycache__
+**/*.pyc
+**/*.pyo
+.pytest_cache
+*.egg-info
+*.egg
+
+.venv
+.vscode
+.claude
+scratchpad/
+tmp/
+
+# Compiled in the builder stage; a stale host copy would shadow it.
+build/
+TQPlib/**/*.so
+*.so
+
+# Run outputs and data — mounted, never baked in.
+data/
+out/
+result*
+*.csv
+debug.out
+experiments/figures
+experiments/experiment_mb
+profiling/results
+fig-01-motivation*.png
+
+# Empty submodule checkout: pybind11 comes from CPM at configure time.
+pybind11/
+
+# The baselines have their own image (baselines/docker/run.sh). bench/ runs on
+# the host and starts this image; local.env holds host-side box settings.
+# Nothing in this image reads them.
+baselines/
+bench/
+local.env*
+
+# Design notes, plans and studies. Nothing in this image reads them, and an
+# edit there would otherwise invalidate `COPY . .` and recompile the engine
+# (make bench runs make build first).
+docs/
+
+# Docker's own files are not needed inside the image.
+Dockerfile
+dockerfile
+docker-compose.yml
+.dockerignore
+Makefile

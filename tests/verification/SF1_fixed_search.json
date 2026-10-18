@@ -1,0 +1,15 @@
+{
+  "3": {
+    "scan 5:71": "RAW",
+    "aggregation 17 two-pass aggregation pass1:inter_hash": "ANS",
+    "aggregation 17 two-pass aggregation pass1:inter_val_0": "BITCOMP",
+    "join 13 0 sort pipeline:sorted_col_92": "ANS",
+    "join 7 1 sort pipeline:sorted_col_68": "RAW"
+  },
+  "9": {
+    "aggregation 31 two-pass aggregation pass1:inter_hash": "ANS",
+    "aggregation 31 two-pass aggregation pass1:inter_val_0": "RAW",
+    "join 22 0 sort pipeline:sorted_col_37": "ANS",
+    "join 27 1 sort pipeline:sorted_col_28": "BITCOMP"
+  }
+}

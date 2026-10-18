@@ -1,0 +1,942 @@
+diff --git a/.gitignore b/.gitignore
+index dc6bf3f..ae362b8 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -5,3 +5,6 @@ build-old/
+ debug-old/
+ answers/
+ ssb-queries/
++
++logs/
++cufile.log
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index fefd2ed..d9cb7e3 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -36,7 +36,7 @@ add_compile_definitions(__is_convertible=__bam_is_convertible)
+ 
+ project("gdsdb" CUDA CXX)
+ 
+-set(CMAKE_CUDA_ARCHITECTURES native)
++set(CMAKE_CUDA_ARCHITECTURES 86)
+ set(CMAKE_CUDA_STANDARD 20)
+ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+ set(CMAKE_CXX_STANDARD 23)
+@@ -929,7 +929,7 @@ target_link_libraries(bam_fused_q5dim PRIVATE cudart)
+ set_target_properties(bam_fused_q5dim PROPERTIES
+     CUDA_STANDARD 17
+     CUDA_STANDARD_REQUIRED ON
+-    CUDA_ARCHITECTURES "80;90"
++    CUDA_ARCHITECTURES "80;86;90"
+     CUDA_SEPARABLE_COMPILATION ON
+ )
+ target_compile_options(bam_fused_q5dim PRIVATE
+diff --git a/scripts/golap/01_sideways_pruning_data_base.sh b/scripts/golap/01_sideways_pruning_data_base.sh
+new file mode 100644
+index 0000000..5fc61f9
+--- /dev/null
++++ b/scripts/golap/01_sideways_pruning_data_base.sh
+@@ -0,0 +1,384 @@
++#!/bin/bash
++# upstream script with configurable DATA_BASE
++# replaces fixed /export data paths
++set -eu # stop on error
++
++SCRIPT_START=$(date +%s)
++step_time() {
++    local label="$1"
++    local start="$2"
++    local end=$(date +%s)
++    local elapsed=$((end - start))
++    echo "TIMING ${label}: ${elapsed}s ($(( elapsed / 60 ))m $(( elapsed % 60 ))s)"
++}
++
++# === CLI parsing ===
++SF=100
++NUM_SPLITS=$(nproc)
++DELETE_INPUT=0
++while [[ $# -gt 0 ]]; do
++    case "$1" in
++        -s) SF="$2"; shift 2 ;;
++        -n) NUM_SPLITS="$2"; shift 2 ;;
++        --delete-input)
++            # Delete input/lineitem and input/orders after each denormalize
++            # step to reduce peak storage. Required for SF>=500 on tight disks.
++            DELETE_INPUT=1; shift ;;
++        *)  echo "Usage: $0 [-s SF] [-n NUM_SPLITS] [--delete-input]" >&2; exit 1 ;;
++    esac
++done
++
++# === Configuration ===
++DATA_BASE="${DATA_BASE:-/export/data1/tpch}"
++INPUT_BASE_DIR="${DATA_BASE}/input${SF}"
++LINEITEM_INPUT_DIR="${INPUT_BASE_DIR}/lineitem"
++ORDERS_INPUT_DIR="${INPUT_BASE_DIR}/orders"
++CUSTOMER_INPUT_DIR="${INPUT_BASE_DIR}/customer"
++NATION_INPUT_DIR="${INPUT_BASE_DIR}/nation"
++REGION_INPUT_DIR="${INPUT_BASE_DIR}/region"
++
++OUTPUT_BASE_DIR="${DATA_BASE}/sideways/sf${SF}"
++LINEITEM_OUTPUT_DIR=${OUTPUT_BASE_DIR}/lineitem
++ORDERS_OUTPUT_DIR=${OUTPUT_BASE_DIR}/orders
++
++SORT_INPUT_BASE_DIR="${OUTPUT_BASE_DIR}/tmp/sort_input"
++
++SORT_LINEITEM_INPUT_DIR="${SORT_INPUT_BASE_DIR}/lineitem"
++SORT_ORDERS_INPUT_DIR="${SORT_INPUT_BASE_DIR}/orders"
++
++DENORM_TMP_DIR="${OUTPUT_BASE_DIR}/tmp/denorm"
++SORT_TMP_DIR="${OUTPUT_BASE_DIR}/tmp/sort"
++DUCKDB_TMP_DIR="${OUTPUT_BASE_DIR}/tmp/duckdb"
++#FINAL_FILE="denormalized_sorted.tbl"
++# DuckDB is used for converting data
++DB_FILE=":memory:"
++
++# Clear any leftover intermediate files from a previous aborted run so
++# that split/rename never see stale numbering.
++for d in "${DENORM_TMP_DIR}" "${SORT_TMP_DIR}" "${DUCKDB_TMP_DIR}" \
++         "${SORT_LINEITEM_INPUT_DIR}" "${SORT_ORDERS_INPUT_DIR}"; do
++    [ -d "${d}" ] && find "${d}" -mindepth 1 -delete 2>/dev/null || true
++done
++
++mkdir -p ${OUTPUT_BASE_DIR} ${DENORM_TMP_DIR} ${SORT_TMP_DIR} ${DUCKDB_TMP_DIR} ${SORT_LINEITEM_INPUT_DIR} ${SORT_ORDERS_INPUT_DIR}
++mkdir -p ${LINEITEM_OUTPUT_DIR} ${ORDERS_OUTPUT_DIR}
++
++SORT_MEM="50%"
++THREADS=$(nproc)
++# LC_ALL=C is required for fast parsing
++export LC_ALL=C
++
++ensure_empty_dir() {
++    local target_dir="$1"
++
++    if [ ! -d "$target_dir" ]; then
++        echo "Error: Directory '$target_dir' does not exist."
++        return 0
++    fi
++
++    if [ -n "$(ls -A "$target_dir")" ]; then
++        echo "Directory '${target_dir}' is not empty."
++        echo "Clean ${target_dir}?"
++        
++        read -p "Clean the directory? [y/N]: " CONFIRM
++
++        case "$CONFIRM" in
++            [yY][eE][sS]|[yY]) 
++                echo "Cleaning directory..."
++                find "$target_dir" -mindepth 1 -delete
++                echo "Directory cleaned."
++                echo "Please rerun the script."
++		exit 0
++                ;;
++            *)
++                echo "Operation aborted by user."
++                exit 1 
++                ;;
++        esac
++    fi
++}
++
++ensure_empty_dir $SORT_LINEITEM_INPUT_DIR
++ensure_empty_dir $SORT_ORDERS_INPUT_DIR
++ensure_empty_dir ${LINEITEM_OUTPUT_DIR}
++ensure_empty_dir ${ORDERS_OUTPUT_DIR}
++
++STEP1_START=$(date +%s)
++echo "[Step 1] Generating denormalized LINEITEM data using DuckDB..."
++duckdb "$DB_FILE" <<EOF
++-- Memory configuration
++SET memory_limit = '128GB';
++SET threads = ${THREADS};
++SET temp_directory = '${DUCKDB_TMP_DIR}';
++
++-- ==========================================
++-- 1. TPC-H view definition
++-- ==========================================
++
++CREATE OR REPLACE VIEW lineitem AS 
++SELECT * FROM read_csv('${LINEITEM_INPUT_DIR}/lineitem.tbl*', delim='|', header=False,
++    columns={'l_orderkey': 'BIGINT', 'l_partkey': 'BIGINT', 'l_suppkey': 'BIGINT', 'l_linenumber': 'INTEGER', 'l_quantity': 'DECIMAL(15,2)', 'l_extendedprice': 'DECIMAL(15,2)', 'l_discount': 'DECIMAL(15,2)', 'l_tax': 'DECIMAL(15,2)', 'l_returnflag': 'VARCHAR', 'l_linestatus': 'VARCHAR', 'l_shipdate': 'DATE', 'l_commitdate': 'DATE', 'l_receiptdate': 'DATE', 'l_shipinstruct': 'VARCHAR', 'l_shipmode': 'VARCHAR', 'l_comment': 'VARCHAR'});
++
++CREATE OR REPLACE VIEW orders AS 
++SELECT * FROM read_csv('${ORDERS_INPUT_DIR}/orders.tbl*', delim='|', header=False,
++    columns={'o_orderkey': 'BIGINT', 'o_custkey': 'INTEGER', 'o_orderstatus': 'VARCHAR', 'o_totalprice': 'DECIMAL(15,2)', 'o_orderdate': 'DATE', 'o_orderpriority': 'VARCHAR', 'o_clerk': 'VARCHAR', 'o_shippriority': 'INTEGER', 'o_comment': 'VARCHAR'});
++
++CREATE OR REPLACE VIEW customer AS 
++SELECT * FROM read_csv('${CUSTOMER_INPUT_DIR}/customer.tbl*', delim='|', header=False,
++    columns={'c_custkey': 'INTEGER', 'c_name': 'VARCHAR', 'c_address': 'VARCHAR', 'c_nationkey': 'INTEGER', 'c_phone': 'VARCHAR', 'c_acctbal': 'DECIMAL(15,2)', 'c_mktsegment': 'VARCHAR', 'c_comment': 'VARCHAR'});
++
++CREATE OR REPLACE VIEW nation AS 
++SELECT * FROM read_csv('${NATION_INPUT_DIR}/nation.tbl*', delim='|', header=False,
++    columns={'n_nationkey': 'INTEGER', 'n_name': 'VARCHAR', 'n_regionkey': 'INTEGER', 'n_comment': 'VARCHAR'});
++
++CREATE OR REPLACE VIEW region AS 
++SELECT * FROM read_csv('${REGION_INPUT_DIR}/region.tbl*', delim='|', header=False,
++    columns={'r_regionkey': 'INTEGER', 'r_name': 'VARCHAR', 'r_comment': 'VARCHAR'});
++
++-- ==========================================
++-- 2. Join & denormanized data
++--    Output data with sort keys
++-- ==========================================
++
++COPY (
++    SELECT 
++        l.l_orderkey, l.l_partkey, l.l_suppkey, l.l_linenumber,  -- 1 - 4
++        l.l_quantity, l.l_extendedprice, l.l_discount, l.l_tax,  -- 5 - 8
++        l.l_returnflag,                                -- 9
++        l.l_linestatus,                                -- 10
++	l.l_shipdate,                                  -- 11 (Key 4 Card 2516)
++	l.l_commitdate,                                -- 12
++	l.l_receiptdate,                               -- 13
++        l.l_shipinstruct, l.l_shipmode, l.l_comment,   -- 14 - 16
++
++        -- [Sort Keys] from other tables
++        r.r_name,        -- Key 1 (Card: 5)  -- 17
++        c.c_mktsegment,  -- Key 2 (Card: 5)  -- 18
++        o.o_orderdate,   -- Key 3 (Card: 2406)  -- 19
++        
++	-- Add tailing '|' for parsing
++	'' AS dummy
++    FROM lineitem l
++    JOIN orders o ON l.l_orderkey = o.o_orderkey
++    JOIN customer c ON o.o_custkey = c.c_custkey
++    JOIN nation n ON c.c_nationkey = n.n_nationkey
++    JOIN region r ON n.n_regionkey = r.r_regionkey
++) 
++TO '${SORT_LINEITEM_INPUT_DIR}'
++(
++    FORMAT CSV, 
++    DELIMITER '|',
++    HEADER FALSE,
++    PER_THREAD_OUTPUT true,
++    QUOTE ''
++);
++EOF
++step_time "Step1_LINEITEM_denormalize" "${STEP1_START}"
++
++if [ "${DELETE_INPUT}" -eq 1 ]; then
++    # LINEITEM denorm CSV is now self-contained in ${SORT_LINEITEM_INPUT_DIR};
++    # the raw dbgen output for lineitem is no longer referenced by
++    # later steps (orders denorm uses the orders/ directory directly,
++    # not the lineitem one). Drop it to reclaim disk space.
++    echo "[--delete-input] removing ${LINEITEM_INPUT_DIR}"
++    rm -rf "${LINEITEM_INPUT_DIR}"
++fi
++
++STEP2_START=$(date +%s)
++echo "[Step 2] Sorting LINEITEM data by cardinality keys..."
++
++TOTAL_LINES=$(find "${SORT_LINEITEM_INPUT_DIR}" -name "*.csv" -print0 | xargs -0 cat | wc -l)
++LINES_PER_FILE=$(( ($TOTAL_LINES + $NUM_SPLITS - 1) / $NUM_SPLITS ))
++
++ls ${SORT_LINEITEM_INPUT_DIR}
++
++# Width of the numeric suffix passed to `split -a`. Must be wide
++# enough to hold NUM_SPLITS distinct values; otherwise GNU split
++# silently switches to its "extended" form (e.g. .9000, .9001, ...)
++# which breaks the subsequent rename pass.
++SPLIT_SUFFIX_LEN=${#NUM_SPLITS}
++
++OUTPUT_DIR=${OUTPUT_BASE_DIR}/lineitem
++mkdir -p ${OUTPUT_DIR}
++sort -T "${SORT_TMP_DIR}" \
++     -t '|' \
++     -k 17,17 \
++     -k 18,18 \
++     -k 19,19 \
++     -k 11,11 \
++     --buffer-size="${SORT_MEM}" \
++     --parallel="${THREADS}" \
++     "${SORT_LINEITEM_INPUT_DIR}"/*.csv \
++| split -l "${LINES_PER_FILE}" \
++        -d \
++        -a "${SPLIT_SUFFIX_LEN}" \
++        - \
++        "${OUTPUT_DIR}/lineitem.tbl."
++
++# Rename .0..N-1  →  .1..N  (loader expects 1-based indexing).
++# Sort numerically and descending so the moves don't collide.
++python3 <<EOF
++import os
++import glob
++
++target_dir = "${OUTPUT_DIR}"
++pattern = os.path.join(target_dir, "lineitem.tbl.[0-9]*")
++
++files = [f for f in glob.glob(pattern) if f.rsplit('.', 1)[1].isdigit()]
++files.sort(key=lambda p: int(p.rsplit('.', 1)[1]), reverse=True)
++
++for old_path in files:
++    base_path, suffix = old_path.rsplit('.', 1)
++    new_num = int(suffix) + 1
++    new_path = f"{base_path}.{new_num}"
++    os.rename(old_path, new_path)
++    print(f"Renamed: {old_path} -> {new_path}")
++EOF
++
++find "$SORT_LINEITEM_INPUT_DIR" -mindepth 1 -delete
++step_time "Step2_LINEITEM_sort_and_split" "${STEP2_START}"
++
++STEP3_START=$(date +%s)
++echo "[Step 3] Generating denormalized ORDERS data using DuckDB..."
++
++duckdb "$DB_FILE" <<EOF
++-- Memory configuration
++SET memory_limit = '128GB';
++SET threads = ${THREADS};
++SET temp_directory = '${DUCKDB_TMP_DIR}';
++
++-- ==========================================
++-- 1. TPC-H view definition
++-- ==========================================
++
++CREATE OR REPLACE VIEW orders AS 
++SELECT * FROM read_csv('${ORDERS_INPUT_DIR}/orders.tbl*', delim='|', header=False,
++    columns={'o_orderkey': 'BIGINT', 'o_custkey': 'INTEGER', 'o_orderstatus': 'VARCHAR', 'o_totalprice': 'DECIMAL(15,2)', 'o_orderdate': 'DATE', 'o_orderpriority': 'VARCHAR', 'o_clerk': 'VARCHAR', 'o_shippriority': 'INTEGER', 'o_comment': 'VARCHAR'});
++
++CREATE OR REPLACE VIEW customer AS 
++SELECT * FROM read_csv('${CUSTOMER_INPUT_DIR}/customer.tbl*', delim='|', header=False,
++    columns={'c_custkey': 'INTEGER', 'c_name': 'VARCHAR', 'c_address': 'VARCHAR', 'c_nationkey': 'INTEGER', 'c_phone': 'VARCHAR', 'c_acctbal': 'DECIMAL(15,2)', 'c_mktsegment': 'VARCHAR', 'c_comment': 'VARCHAR'});
++
++CREATE OR REPLACE VIEW nation AS 
++SELECT * FROM read_csv('${NATION_INPUT_DIR}/nation.tbl*', delim='|', header=False,
++    columns={'n_nationkey': 'INTEGER', 'n_name': 'VARCHAR', 'n_regionkey': 'INTEGER', 'n_comment': 'VARCHAR'});
++
++CREATE OR REPLACE VIEW region AS 
++SELECT * FROM read_csv('${REGION_INPUT_DIR}/region.tbl*', delim='|', header=False,
++    columns={'r_regionkey': 'INTEGER', 'r_name': 'VARCHAR', 'r_comment': 'VARCHAR'});
++
++COPY (
++    SELECT 
++        
++        -- [Attributes]
++        o.o_orderkey,      -- 1
++        o.o_custkey,       -- 2
++        o.o_orderstatus,   -- 3
++        o.o_totalprice,    -- 4
++        o.o_orderdate,     -- 5 (Key 3 Card 2406)
++        o.o_orderpriority, -- 6
++        o.o_clerk,         -- 7
++        o.o_shippriority,  -- 8
++        o.o_comment,       -- 9
++
++        -- [Additional Sort Keys]
++	r.r_name,        -- 10 (Key 1 Card 5)
++	c.c_mktsegment,  -- 11 (Key 2 Card 5)
++        
++	-- Add tailing '|' for parsing
++	'' AS dummy
++    FROM orders o
++    JOIN customer c ON o.o_custkey = c.c_custkey
++    JOIN nation n ON c.c_nationkey = n.n_nationkey
++    JOIN region r ON n.n_regionkey = r.r_regionkey
++) 
++TO '${SORT_ORDERS_INPUT_DIR}'
++(
++    FORMAT CSV, 
++    DELIMITER '|', 
++    HEADER FALSE, 
++    PER_THREAD_OUTPUT true,
++    QUOTE ''
++);
++EOF
++step_time "Step3_ORDERS_denormalize" "${STEP3_START}"
++
++if [ "${DELETE_INPUT}" -eq 1 ]; then
++    # ORDERS denorm CSV is now self-contained in ${SORT_ORDERS_INPUT_DIR}.
++    # The raw dbgen orders/ directory is no longer needed.
++    echo "[--delete-input] removing ${ORDERS_INPUT_DIR}"
++    rm -rf "${ORDERS_INPUT_DIR}"
++fi
++
++STEP4_START=$(date +%s)
++echo "[Step 4] Sorting ORDERS data by cardinality keys..."
++
++TOTAL_LINES=$(find "${SORT_ORDERS_INPUT_DIR}" -name "*.csv" -print0 | xargs -0 cat | wc -l)
++LINES_PER_FILE=$(( ($TOTAL_LINES + $NUM_SPLITS - 1) / $NUM_SPLITS ))
++
++ls ${SORT_ORDERS_INPUT_DIR}
++
++OUTPUT_DIR=${OUTPUT_BASE_DIR}/orders
++mkdir -p ${OUTPUT_DIR}
++sort -T "${SORT_TMP_DIR}" \
++     -t '|' \
++     -k 10,10 \
++     -k 11,11 \
++     -k 5,5 \
++     --buffer-size="${SORT_MEM}" \
++     --parallel="${THREADS}" \
++     "${SORT_ORDERS_INPUT_DIR}"/*.csv \
++| split -l "${LINES_PER_FILE}" \
++        -d \
++        -a "${SPLIT_SUFFIX_LEN}" \
++        - \
++        "${OUTPUT_DIR}/orders.tbl."
++
++# Rename .0..N-1  →  .1..N  (loader expects 1-based indexing).
++# Sort numerically and descending so the moves don't collide.
++python3 <<EOF
++import os
++import glob
++
++target_dir = "${OUTPUT_DIR}"
++pattern = os.path.join(target_dir, "orders.tbl.[0-9]*")
++
++files = [f for f in glob.glob(pattern) if f.rsplit('.', 1)[1].isdigit()]
++files.sort(key=lambda p: int(p.rsplit('.', 1)[1]), reverse=True)
++
++for old_path in files:
++    base_path, suffix = old_path.rsplit('.', 1)
++    new_num = int(suffix) + 1
++    new_path = f"{base_path}.{new_num}"
++    os.rename(old_path, new_path)
++    print(f"Renamed: {old_path} -> {new_path}")
++EOF
++
++find "$SORT_ORDERS_INPUT_DIR" -mindepth 1 -delete
++find "${SORT_TMP_DIR}" -mindepth 1 -delete 2>/dev/null || true
++find "${DUCKDB_TMP_DIR}" -mindepth 1 -delete 2>/dev/null || true
++step_time "Step4_ORDERS_sort_and_split" "${STEP4_START}"
++
++
++## Prepaing other table directory
++## (dim tables are NOT touched by --delete-input: they are referenced
++##  by symlinks below and are required by downstream scripts.)
++tables=(supplier partsupp part customer nation region)
++
++for table in ${tables[@]}
++do
++  SRCDIR=${INPUT_BASE_DIR}/${table}
++  DSTDIR=${OUTPUT_BASE_DIR}/${table}
++  if [ -e "${DSTDIR}" ] || [ -L "${DSTDIR}" ]; then
++    echo Skip creating ${DSTDIR}
++  else
++    ln -sr "${SRCDIR}" "${DSTDIR}"
++  fi
++done
++
++echo ""
++echo "=== TPC-H sideways pruning complete (SF=${SF}) ==="
++echo "Output: ${OUTPUT_BASE_DIR}/"
++echo "  lineitem/ : $(ls "${LINEITEM_OUTPUT_DIR}" | wc -l) chunks"
++echo "  orders/   : $(ls "${ORDERS_OUTPUT_DIR}" | wc -l) chunks"
++step_time "Total" "${SCRIPT_START}"
+diff --git a/scripts/tpch/dbgen.local.sh b/scripts/tpch/dbgen.local.sh
+new file mode 100755
+index 0000000..049436c
+--- /dev/null
++++ b/scripts/tpch/dbgen.local.sh
+@@ -0,0 +1,116 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++###############################################################################
++# Option flags (table selection)
++###############################################################################
++declare -a tables=()
++all=false
++
++while getopts ":AcLnOPSrs" opt; do
++  case "$opt" in
++    A) all=true ;;
++    c) 
++      tables+=(customer)
++      opts+=(c)
++      ;;
++    L)
++      tables+=(lineitem)
++      opts+=(L)
++      ;;
++    n)
++      tables+=(nation)
++      opts+=(n)
++      ;;
++    O)
++      tables+=(orders)
++      opts+=(O)
++      ;;
++    P)
++      tables+=(part)
++      opts+=(P)
++      ;;
++    S)
++      tables+=(partsupp)
++      opts+=(S)
++      ;;
++    r)
++      tables+=(region)
++      opts+=(r)
++      ;;
++    s)
++      tables+=(supplier)
++      opts+=(s)
++      ;;
++    *) usage ;;
++  esac
++done
++shift $((OPTIND-1))   # ← everything before this point were options
++
++if $all; then
++  tables=("customer" "lineitem" "nation" "orders" "part" "partsupp" "region" "supplier")
++  opts=("c" "L" "n" "O" "P" "S" "r" "s")
++fi
++
++
++###############################################################################
++# Positional parameters (legacy 4 args)
++###############################################################################
++if [ $# -ne 4 ]; then
++  echo "Usage: $(basename "$0") [table-options] <dbgendir> <scale_factor> <num_threads> <destdir>"
++  exit 1
++fi
++
++dbgendir=$(realpath "$1")
++sf="$2"
++nthr="$3"
++destdir=$(realpath "$4")
++
++# Hook Ctrl+C and kill all dbgen tasks
++# trap '[ 0 -lt $(jobs | wc -l) ] && kill -HUP $(jobs -p)' EXIT
++trap 'jobs -pr | xargs -r kill 2>/dev/null || true' EXIT
++
++
++export DSS_CONFIG=${dbgendir}/
++
++pushd $destdir
++
++# mkdir
++for tbl in ${tables[@]}
++do
++  mkdir -p $tbl
++done
++
++
++for tbidx in ${!tables[@]}
++do
++  tblname=${tables[$tbidx]}
++  optname=${opts[$tbidx]}
++
++  echo "Generating $tblname..."
++  mkdir -p ${tblname}
++  pushd ${tblname}
++
++  PIDS=()
++  if [ $nthr -eq 1 ]; then
++    (
++      "$dbgendir/dbgen" -T ${optname} -f -s ${sf}
++      echo -e "\tProgress:1/1"
++    )&
++    PIDS+=($!)
++  else
++    for i in $(seq 1 ${nthr})
++    do
++        (
++        "$dbgendir/dbgen" -T ${optname} -f -s ${sf} -C ${nthr} -S ${i}
++        echo -e "\tProgress:${i}/${nthr}"
++        )&
++        PIDS+=($!)
++    done
++  fi
++  wait
++  popd
++done
++
++wait
++popd
+diff --git a/scripts/tpch/dbgen.sh b/scripts/tpch/dbgen.sh
+index e2229e7..3e58815 100755
+--- a/scripts/tpch/dbgen.sh
++++ b/scripts/tpch/dbgen.sh
+@@ -71,14 +71,14 @@ destdir=$(realpath "$4")
+ trap 'jobs -pr | xargs -r kill 2>/dev/null || true' EXIT
+ 
+ 
+-export DSS_CONFIG=${dbgendir}/
++export DSS_CONFIG="${dbgendir}/"
+ 
+-pushd $destdir
++pushd "$destdir"
+ 
+ # mkdir
+ for tbl in ${tables[@]}
+ do
+-  mkdir -p $tbl
++  mkdir -p "$tbl"
+ done
+ 
+ 
+@@ -88,13 +88,13 @@ do
+   optname=${opts[$tbidx]}
+ 
+   echo "Generating $tblname..."
+-  mkdir -p ${tblname}
+-  pushd ${tblname}
++  mkdir -p "${tblname}"
++  pushd "${tblname}"
+ 
+   PIDS=()
+   if [ $nthr -eq 1 ]; then
+     (
+-      $dbgendir/dbgen -T ${optname} -f -s ${sf}
++      "${dbgendir}/dbgen" -T ${optname} -f -s ${sf}
+       echo -e "\tProgress:1/1"
+     )&
+     PIDS+=($!)
+@@ -102,7 +102,7 @@ do
+     for i in $(seq 1 ${nthr})
+     do
+         (
+-        $dbgendir/dbgen -T ${optname} -f -s ${sf} -C ${nthr} -S ${i}
++        "${dbgendir}/dbgen" -T ${optname} -f -s ${sf} -C ${nthr} -S ${i}
+         echo -e "\tProgress:${i}/${nthr}"
+         )&
+         PIDS+=($!)
+diff --git a/scripts/tpch/run_dbgen.local.sh b/scripts/tpch/run_dbgen.local.sh
+new file mode 100755
+index 0000000..a5edbc2
+--- /dev/null
++++ b/scripts/tpch/run_dbgen.local.sh
+@@ -0,0 +1,79 @@
++#!/usr/bin/env bash
++# run_dbgen.sh — Generate TPC-H data for one or more scale factors.
++#
++# Each SF is generated under /export/data1/tpch/input${SF}/ with the
++# per-table directory layout expected by the loader:
++#   input${SF}/{lineitem,orders,customer,part,partsupp,supplier,nation,region}/
++#
++# Usage:
++#   scripts/tpch/run_dbgen.sh <SF>[,<SF>...] [<threads>] [<destbase>]
++#
++# Examples:
++#   scripts/tpch/run_dbgen.sh 100
++#   scripts/tpch/run_dbgen.sh 50,100,200,300,400
++#   scripts/tpch/run_dbgen.sh 100 48
++#   scripts/tpch/run_dbgen.sh 100 48 /scratch/tpch
++#
++# Prerequisites:
++#   - The TPC-H dbgen kit must be downloaded and built by the user.
++#     The official kit is distributed by the Transaction Processing
++#     Performance Council at https://www.tpc.org/tpch/ and ships with
++#     the TPC End-User License Agreement. The user is responsible for
++#     accepting the EULA and running `make` inside the kit's dbgen/
++#     directory.
++#   - Point TPCH_DBGEN_DIR to the directory containing the built
++#     `dbgen` executable. Either export it in the environment or set it
++#     in scripts/common.sh. If unset, the script falls back to
++#     tpch-tool/tpch_2_17_0/dbgen/ under the repository root.
++
++set -euo pipefail
++
++SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
++REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
++DBGEN_DIR="${TPCH_DBGEN_DIR:-${REPO_ROOT}/tpch-tool/tpch_2_17_0/dbgen}"
++
++if [ $# -lt 1 ]; then
++    cat >&2 <<EOF
++Usage: $(basename "$0") <SF>[,<SF>...] [<threads>] [<destbase>]
++
++  <SF>        : scale factor(s), comma-separated (e.g. "100" or "50,100,200,300,400")
++  <threads>   : number of parallel dbgen workers (default: \$(nproc))
++  <destbase>  : parent directory; each SF becomes <destbase>/input<SF>
++                (default: /export/data1/tpch)
++EOF
++    exit 1
++fi
++
++IFS=',' read -ra SFS <<< "$1"
++NTHR="${2:-$(nproc)}"
++DESTBASE="${3:-/export/data1/tpch}"
++
++if [ ! -x "${DBGEN_DIR}/dbgen" ]; then
++    echo "ERROR: ${DBGEN_DIR}/dbgen not found or not executable." >&2
++    echo "  Download the TPC-H dbgen kit from https://www.tpc.org/tpch/," >&2
++    echo "  accept the TPC EULA, build it (cd <kit>/dbgen && make), and" >&2
++    echo "  set TPCH_DBGEN_DIR to point at the built dbgen directory:" >&2
++    echo "    export TPCH_DBGEN_DIR=/path/to/tpch_kit/dbgen" >&2
++    echo "  (or set it in scripts/common.sh)" >&2
++    exit 1
++fi
++
++echo "=============================================================="
++echo "  TPC-H dbgen"
++echo "    SFs     : ${SFS[*]}"
++echo "    threads : ${NTHR}"
++echo "    destbase: ${DESTBASE}"
++echo "=============================================================="
++
++for SF in "${SFS[@]}"; do
++    DIR="${DESTBASE}/input${SF}"
++    echo ""
++    echo "--- SF=${SF} → ${DIR} ---"
++    mkdir -p "${DIR}"
++    bash "${SCRIPT_DIR}/dbgen.local.sh" -A "${DBGEN_DIR}" "${SF}" "${NTHR}" "${DIR}"
++done
++
++echo ""
++echo "=============================================================="
++echo "  Done. Generated SFs: ${SFS[*]}"
++echo "=============================================================="
+diff --git a/src/common/common.cu b/src/common/common.cu
+index e58b858..a695244 100644
+--- a/src/common/common.cu
++++ b/src/common/common.cu
+@@ -530,6 +530,10 @@ void open_files(BenchmarkOptions &options, std::vector<int> &fds)
+     for (i = 0; i < options.ndev; i++)
+     {
+         int fd = open(options.devname[i], oflag, 0644);
++        if (fd < 0 && errno == EINVAL && (oflag & O_DIRECT))
++        {
++            fd = open(options.devname[i], oflag & ~O_DIRECT, 0644);
++        }
+         if (fd < 0)
+         {
+             std::cerr << "failed to open file " << options.file << std::endl;
+diff --git a/src/common/primitive_cuda.cu b/src/common/primitive_cuda.cu
+index 3fe6ac4..177b6c8 100644
+--- a/src/common/primitive_cuda.cu
++++ b/src/common/primitive_cuda.cu
+@@ -55,7 +55,19 @@ inline void mb_cuda_set_context(CUcontext ctx)
+ inline void *mb_cuda_alloc(size_t size)
+ {
+     void *dev_ptr = nullptr;
+-    checkCudaErrors(cudaMalloc(&dev_ptr, size));
++    size_t free_mem = 0;
++    size_t total_mem = 0;
++    cudaMemGetInfo(&free_mem, &total_mem);
++    fprintf(stderr, "[cuda_alloc] request_mb=%.2f free_mb=%.2f total_mb=%.2f\n",
++            size / 1048576.0, free_mem / 1048576.0, total_mem / 1048576.0);
++    cudaError_t err = cudaMalloc(&dev_ptr, size);
++    if (err != cudaSuccess) {
++        cudaMemGetInfo(&free_mem, &total_mem);
++        fprintf(stderr, "[cuda_alloc_failed] request_mb=%.2f free_mb=%.2f total_mb=%.2f error=%s\n",
++                size / 1048576.0, free_mem / 1048576.0, total_mem / 1048576.0,
++                cudaGetErrorString(err));
++    }
++    checkCudaErrors(err);
+     checkCudaErrors(cudaMemset(dev_ptr, 0x00, size));
+     return dev_ptr;
+ }
+diff --git a/src/common/shim_nvml.cu b/src/common/shim_nvml.cu
+index cb9b90c..421b0a5 100644
+--- a/src/common/shim_nvml.cu
++++ b/src/common/shim_nvml.cu
+@@ -3,6 +3,7 @@
+ #include <unistd.h>
+ 
+ #include <cstdio>
++#include <cstdlib>
+ 
+ #include <nvml.h>
+ 
+@@ -10,6 +11,8 @@ namespace nvml
+ {
+     namespace
+     {
++        bool initialized = false;
++
+         void check(nvmlReturn_t result)
+         {
+             if (result != NVML_SUCCESS)
+@@ -22,16 +25,24 @@ namespace nvml
+ 
+     void init()
+     {
+-        check(nvmlInit());
++        auto result = nvmlInit();
++        if (result != NVML_SUCCESS && std::getenv("GOLAP_ALLOW_NVML_FAILURE"))
++        {
++            fprintf(stderr, "NVML disabled: %s\n", nvmlErrorString(result));
++            return;
++        }
++        check(result);
++        initialized = true;
+     }
+ 
+     void shutdown()
+     {
+-        check(nvmlShutdown());
++        if (initialized) check(nvmlShutdown());
+     }
+ 
+     unsigned int device_get_count()
+     {
++        if (!initialized) return 0;
+         unsigned int count = 0;
+         check(nvmlDeviceGetCount(&count));
+         return count;
+diff --git a/src/common/tpch_loader.cu b/src/common/tpch_loader.cu
+index 8f74d44..8a00cf2 100644
+--- a/src/common/tpch_loader.cu
++++ b/src/common/tpch_loader.cu
+@@ -9822,6 +9822,10 @@ void open_output_files(LoaderOptions &options, std::vector<int> &fds)
+     for (i = 0; i < options.ndev; i++)
+     {
+         int fd = open(options.devname[i], oflag, 0644);
++        if (fd < 0 && errno == EINVAL && (oflag & O_DIRECT))
++        {
++            fd = open(options.devname[i], oflag & ~O_DIRECT, 0644);
++        }
+         if (fd < 0)
+         {
+             std::cerr << "failed to open file " << options.output_files << std::endl;
+diff --git a/src/tpch/gidp.cu b/src/tpch/gidp.cu
+index 199cb15..522d59f 100644
+--- a/src/tpch/gidp.cu
++++ b/src/tpch/gidp.cu
+@@ -24,6 +24,7 @@
+ #include <span>
+ #include <numeric>
+ #include <algorithm>
++#include <cstdlib>
+ //#include <nvcomp.h>
+ #include <nvcomp/snappy.h>
+ #include <nvcomp/lz4.h>
+@@ -37,6 +38,20 @@
+ 
+ constexpr size_t MAX_GDS_DEVICES = 64;
+ 
++static size_t env_size(const char *name, size_t fallback)
++{
++    const char *value = std::getenv(name);
++    if (!value || !*value) return fallback;
++    char *end = nullptr;
++    size_t parsed = std::strtoull(value, &end, 10);
++    return *end || parsed == 0 ? fallback : parsed;
++}
++
++static uint64_t golap_gpu_budget_bytes()
++{
++    return env_size("GOLAP_GPU_MEM_GB", 40) * 1024ULL * 1024ULL * 1024ULL;
++}
++
+ // Collect unique compression method names from FieldPageInfo vectors.
+ // Returns e.g. "NONE", "SNAPPY", "SNAPPY+LZ4" (sorted, deduplicated).
+ static std::string collect_compression_methods(
+@@ -4196,6 +4211,10 @@ static void tpch_worker_alloc(
+         }
+         size_t buf_size = max_ppw * page_size;
+         for (int b = 0; b < 2; b++) {
++            std::cerr << "[Q5 alloc] function=tpch_worker_alloc worker=" << t
++                      << " staging_buf=" << b
++                      << " request_mb=" << (double)buf_size / (1024 * 1024)
++                      << std::endl;
+             w.staging_buf[b] = mb_cuda_alloc(buf_size);
+             GDS_CHECK(cuFileBufRegister(w.staging_buf[b], buf_size, 0));
+         }
+@@ -4675,7 +4694,9 @@ BenchmarkResult tpch_q5(BenchmarkOptions &options) {
+     // ── Tile execution constants ──
+     constexpr size_t Q5_TILE_PAGES_MAX = 1024;
+     const size_t o_npages_i32 = fi_o_orderdate.npages;
+-    const size_t Q5_TILE_PAGES_O = o_npages_i32;  // all ORDERS in one tile
++    const size_t q5_tile_pages_cap = std::min(
++        env_size("Q5_TILE_PAGES", Q5_TILE_PAGES_MAX), Q5_TILE_PAGES_MAX);
++    const size_t Q5_TILE_PAGES_O = std::min(o_npages_i32, q5_tile_pages_cap);
+     const size_t o_npages_i64 = fi_o_orderkey.npages;
+     const size_t l_npages_i32 = fi_l_extprice.npages;
+     const size_t l_npages_i64 = fi_l_orderkey.npages;
+@@ -4718,7 +4739,7 @@ BenchmarkResult tpch_q5(BenchmarkOptions &options) {
+     //   Case 2: T*i64_r > o_staging → staging_pages ≈ T*i64_r, all costs scale
+     size_t Q5_TILE_PAGES;
+     {
+-        constexpr uint64_t GPU_MEM_BUDGET = 40ULL * 1024 * 1024 * 1024;
++        const uint64_t GPU_MEM_BUDGET = golap_gpu_budget_bytes();
+         uint64_t fixed_bytes = 256;
+         fixed_bytes += (uint64_t)(fi_s_suppkey.npages + fi_s_nationkey.npages) * page_size;
+         fixed_bytes += (uint64_t)nrecs_supplier * 16;
+@@ -4757,7 +4778,7 @@ BenchmarkResult tpch_q5(BenchmarkOptions &options) {
+         } else {
+             T = 1;
+         }
+-        Q5_TILE_PAGES = std::min(Q5_TILE_PAGES_MAX, std::max((size_t)1, T));
++        Q5_TILE_PAGES = std::min(q5_tile_pages_cap, std::max((size_t)1, T));
+     }
+     Q5_TILE_PAGES = std::min(Q5_TILE_PAGES, l_npages_i32);  // never exceed actual column
+     size_t l_num_tiles = (l_npages_i32 + Q5_TILE_PAGES - 1) / Q5_TILE_PAGES;
+@@ -4782,6 +4803,8 @@ BenchmarkResult tpch_q5(BenchmarkOptions &options) {
+     size_t staging_pages = std::max({Q5_TILE_PAGES_O, Q5_TILE_PAGES,
+                                       o_i64_tile_npages_max,
+                                       l_i64_tile_npages_max});
++    std::cout << "[Q5] gpu_budget_gb=" << (golap_gpu_budget_bytes() >> 30)
++              << " tile_pages=" << q5_tile_pages_cap << std::endl;
+     if (tile_nrows_max_o == 0) tile_nrows_max_o = 1;
+     if (tile_nrows_max_l == 0) tile_nrows_max_l = 1;
+     if (o_i64_nrows_max == 0) o_i64_nrows_max = 1;
+@@ -4956,8 +4979,12 @@ BenchmarkResult tpch_q5(BenchmarkOptions &options) {
+     // ORDERS needs 3 (1 INT32 + 2 INT64), LINEITEM needs 4 (2 INT32 + 2 INT64)
+     static constexpr size_t Q5_NUM_COL_BUFS = 4;
+     void *tile_col_bufs[Q5_NUM_COL_BUFS];
+-    for (size_t i = 0; i < Q5_NUM_COL_BUFS; i++)
++    for (size_t i = 0; i < Q5_NUM_COL_BUFS; i++) {
++        std::cerr << "[Q5 alloc] function=tpch_q5 tile_col_buf=" << i
++                  << " request_mb=" << (double)(staging_pages * page_size) / (1024 * 1024)
++                  << std::endl;
+         tile_col_bufs[i] = mb_cuda_alloc(staging_pages * page_size);
++    }
+ 
+     uint64_t *d_o_orderdate_flat = nullptr;
+     uint64_t *d_o_orderkey_flat = nullptr, *d_o_custkey_flat = nullptr;
+@@ -4985,7 +5012,7 @@ BenchmarkResult tpch_q5(BenchmarkOptions &options) {
+     size_t gpu_free_before_workers = 0;
+     cudaMemGetInfo(&gpu_free_before_workers, &gpu_total_dummy);
+     size_t non_staging_bytes = gpu_free_start - gpu_free_before_workers;
+-    static constexpr size_t GPU_MEM_BUDGET = 40ULL * 1024 * 1024 * 1024;
++    const size_t GPU_MEM_BUDGET = golap_gpu_budget_bytes();
+     size_t min_ppw = (staging_pages + nthreads - 1) / nthreads;
+     size_t max_ppw = min_ppw;
+     if (GPU_MEM_BUDGET > non_staging_bytes) {
+@@ -5978,7 +6005,9 @@ BenchmarkResult tpch_q3(BenchmarkOptions &options) {
+     // ── Tile execution constants ──
+     constexpr size_t Q3_TILE_PAGES_MAX = 1024;
+     const size_t o_npages_i32 = fi_o_orderdate.npages;
+-    const size_t Q3_TILE_PAGES_O = o_npages_i32;  // all ORDERS in one tile
++    const size_t q3_tile_pages_cap = std::min(
++        env_size("Q3_TILE_PAGES", Q3_TILE_PAGES_MAX), Q3_TILE_PAGES_MAX);
++    const size_t Q3_TILE_PAGES_O = std::min(o_npages_i32, q3_tile_pages_cap);
+     const size_t l_npages_i32 = fi_l_shipdate.npages;
+     const size_t o_npages_i64 = fi_o_orderkey.npages;
+     const size_t l_npages_i64 = fi_l_orderkey.npages;
+@@ -6039,7 +6068,7 @@ BenchmarkResult tpch_q3(BenchmarkOptions &options) {
+     // ── Budget-based Q3_TILE_PAGES (40 GiB cap) ──
+     size_t Q3_TILE_PAGES;
+     {
+-        constexpr uint64_t GPU_MEM_BUDGET = 40ULL * 1024 * 1024 * 1024;
++        const uint64_t GPU_MEM_BUDGET = golap_gpu_budget_bytes();
+         uint64_t fixed_bytes = 0;
+         // CUSTOMER flat + hash set
+         fixed_bytes += (uint64_t)nrecs_customer * 8;
+@@ -6089,7 +6118,7 @@ BenchmarkResult tpch_q3(BenchmarkOptions &options) {
+         } else {
+             T = 1;
+         }
+-        Q3_TILE_PAGES = std::min(Q3_TILE_PAGES_MAX, std::max((size_t)1, T));
++        Q3_TILE_PAGES = std::min(q3_tile_pages_cap, std::max((size_t)1, T));
+     }
+     Q3_TILE_PAGES = std::min(Q3_TILE_PAGES, l_npages_i32);  // never exceed actual column
+     size_t l_num_tiles = (l_npages_i32 + Q3_TILE_PAGES - 1) / Q3_TILE_PAGES;
+@@ -6115,6 +6144,8 @@ BenchmarkResult tpch_q3(BenchmarkOptions &options) {
+     size_t staging_pages = std::max({Q3_TILE_PAGES_O,
+                                       o_i64_tile_npages_max,
+                                       l_i64_tile_npages_max});
++    std::cout << "[Q3] gpu_budget_gb=" << (golap_gpu_budget_bytes() >> 30)
++              << " tile_pages=" << q3_tile_pages_cap << std::endl;
+     if (tile_nrows_max_o == 0) tile_nrows_max_o = 1;
+     if (tile_nrows_max_l == 0) tile_nrows_max_l = 1;
+     if (o_i64_nrows_max == 0) o_i64_nrows_max = 1;
+@@ -6391,7 +6422,7 @@ BenchmarkResult tpch_q3(BenchmarkOptions &options) {
+     while (orders_ht_cap < est_orders_qual * 2) orders_ht_cap <<= 1;
+ 
+     {
+-        static constexpr uint64_t GPU_MEM_BUDGET_Q3 = 40ULL * 1024 * 1024 * 1024;
++        const uint64_t GPU_MEM_BUDGET_Q3 = golap_gpu_budget_bytes();
+         size_t gpu_free_now = 0;
+         cudaMemGetInfo(&gpu_free_now, &gpu_total_dummy);
+         uint64_t app_used = gpu_free_start - gpu_free_now;
+@@ -6556,7 +6587,7 @@ BenchmarkResult tpch_q3(BenchmarkOptions &options) {
+ 
+     // Phase 2: allocate per-loader io_buf with dynamic sizing (Rule 4: gpu_mem ≤ 40 GiB)
+     {
+-        static constexpr size_t GPU_MEM_BUDGET = 40ULL * 1024 * 1024 * 1024;
++        const size_t GPU_MEM_BUDGET = golap_gpu_budget_bytes();
+         size_t gpu_free_before_loaders = 0;
+         cudaMemGetInfo(&gpu_free_before_loaders, &gpu_total_dummy);
+         size_t non_loader_bytes = gpu_free_start - gpu_free_before_loaders;

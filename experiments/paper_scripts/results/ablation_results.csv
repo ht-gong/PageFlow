@@ -1,0 +1,23 @@
+setting,label,sf,chunk_size_mb,partition_budget_mb,query,status,n_ok,reps,rep_seconds,mean_s,error,restarts,flags,commit,gpu,finished_utc
+uvm,UVM,1000,512,512,1,OK,1,1,55.479712,55.479712,,5,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-16 21:05:19
+uvm,UVM,1000,512,512,2,OK,1,1,25.867585,25.867585,,5,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-16 21:05:19
+uvm,UVM,1000,512,512,3,OK,1,1,444.234305,444.234305,,5,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-16 21:05:19
+uvm,UVM,1000,512,512,4,OK,1,1,81.609644,81.609644,,5,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-16 21:05:19
+uvm,UVM,1000,512,512,5,OK,1,1,1505.110948,1505.110948,,0,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-17 00:50:02
+uvm,UVM,1000,512,512,6,OK,1,1,50.976517,50.976517,,5,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-16 21:05:19
+uvm,UVM,1000,512,512,7,OK,1,1,763.536858,763.536858,,0,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-17 00:50:02
+uvm,UVM,1000,512,512,8,OK,1,1,787.747075,787.747075,,0,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-17 00:50:02
+uvm,UVM,1000,512,512,9,FAIL,0,1,NA,,stopped by hand after 2 h 49 min (no time limit),0,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-17 00:50:02
+uvm,UVM,1000,512,512,10,OK,1,1,1465.020363,1465.020363,,0,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-17 01:24:04
+uvm,UVM,1000,512,512,11,OK,1,1,26.225083,26.225083,,5,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-16 21:05:19
+uvm,UVM,1000,512,512,12,OK,1,1,321.773717,321.773717,,5,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-16 21:05:19
+uvm,UVM,1000,512,512,13,OK,1,1,75.395164,75.395164,,5,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-16 21:05:19
+uvm,UVM,1000,512,512,14,OK,1,1,185.333531,185.333531,,5,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-16 21:05:19
+uvm,UVM,1000,512,512,15,OK,1,1,77.154584,77.154584,,5,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-16 21:05:19
+uvm,UVM,1000,512,512,16,OK,1,1,17.900979,17.900979,,5,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-16 21:05:19
+uvm,UVM,1000,512,512,17,OK,1,1,349.954355,349.954355,,5,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-16 21:05:19
+uvm,UVM,1000,512,512,18,OK,1,1,413.271769,413.271769,,5,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-16 21:05:19
+uvm,UVM,1000,512,512,19,OK,1,1,78.529052,78.529052,,5,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-16 21:05:19
+uvm,UVM,1000,512,512,20,OK,1,1,152.521935,152.521935,,5,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-16 21:05:19
+uvm,UVM,1000,512,512,21,OK,1,1,379.521962,379.521962,,0,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-17 01:24:04
+uvm,UVM,1000,512,512,22,OK,1,1,8.679092,8.679092,,0,--SF 1000 --q --chunk_size_mb 512 --partition_budget_mb 512 --cmp_pool_gb 29 --no_debug --uvm --perf_report <perf>,908458b+dirty,1,2026-10-17 01:24:04

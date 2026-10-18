@@ -1,0 +1,69 @@
+# Sirius (gpu_execution) config for the TPC-H SF500 baseline.
+# Single 32 GB RTX 5090, out-of-core: GPU -> pinned host RAM -> disk spill.
+# Mirrors the single-GPU + host-spill regime the rapids/polars-GPU baselines use.
+# Schema: docs/super-sirius/configuration.md in the sirius clone.
+sirius:
+  # One GPU, to match the single-GPU baseline (rapids local[*], polars device 0).
+  topology: { num_gpus: 1 }
+
+  memory:
+    gpu:
+      usage_limit_fraction: 0.95        # ~30 GB of the 32 GB card; 5% left for CUDA/cuDF
+      reservation_limit_fraction: 0.9
+      downgrade_trigger_fraction: 0.8   # start evicting GPU->host at 80% reserved
+      downgrade_stop_fraction: 0.6
+    host:
+      # Pinned host tier. Grows on demand up to capacity (initial footprint =
+      # block_size*pool_size*initial_number_pools), so startup stays cheap while
+      # allowing a large spill tier on this 2 TB box. One host memory space for
+      # the box's 2 NUMA nodes (Sirius's log), so this is the total, not per
+      # node (docs/engine_spill_plan.md §3.6). 256 GiB keeps SF1000 off the
+      # disk tier: with the 1.5 GiB hash budget below, at 128 GiB q18 moved
+      # 45 GB host -> disk; at 256 GiB no query did (2026-10-12, plan §10
+      # "SF1000: keeping spill in host memory"). Until then it was 128Gi, and
+      # every Sirius row in all_results.csv up to then used 128Gi.
+      capacity_bytes: 256Gi
+      initial_number_pools: 4           # ~2 GiB pinned at startup, grows as needed
+      pool_size: 512
+      block_size: 1Mi
+      downgrade_trigger_fraction: 0.8   # host->disk spill only under real pressure
+      downgrade_stop_fraction: 0.7
+    disk:
+      # Last-resort spill tier (host RAM tier above absorbs almost everything at
+      # SF500). Placed on /dev/shm (RAM-backed, O_DIRECT-capable) so it can never
+      # fill the 58 GB root disk; cuCascade hard-caps it at capacity_bytes, and
+      # 40 GB + the ~180 GB parquet still fits /dev/shm's 251 GB. The run script's
+      # / watchdog is a second safety net (covers any DuckDB CPU-fallback temp).
+      disk_id: 0
+      capacity_bytes: 40GB
+      downgrade_root_dirs: "/dev/shm/_sirius_spill"
+
+  executor:
+    # IO backend for parquet scans. use_sirius_datasource:true = Sirius' native
+    # io_uring datasource (upstream default; O_DIRECT reads through pinned bounce
+    # buffers, uring_n_reactors reactor threads -- upstream's SF1000 bench uses 4).
+    # run_sirius.sh probes io_uring at start-up and, where the container blocks
+    # io_uring_setup (the old Vast box did: "uring_reactor: ring init: Operation
+    # not permitted"), rewrites this to false so the kvikio POSIX fallback is
+    # used instead (SIRIUS_IO=kvikio forces that). Single-GPU only either way.
+    scan_manager: { num_threads: 16, use_sirius_datasource: true, uring_n_reactors: 4, enable_prefetch_cache: false }
+    pipeline:     { num_threads: 8 }
+    downgrade:    { num_threads: 4 }
+    task_creator: { num_threads: 2 }
+
+  operator_params:
+    scan_task_batch_size:       805306368   # 768 MiB
+    max_sort_partition_bytes:   0           # auto = 33% GPU mem
+    hash_partition_bytes:       805306368
+    concat_batch_bytes:         805306368
+    # 1.5 GiB: Sirius's own default on this card at the pinned commit (2x its
+    # GPU-derived batch size, 1.49 GiB). Until 2026-10-08 this was 805306368
+    # (768 MiB), copied from Sirius's July example config when the default was
+    # 500 MB; Sirius's August defaults made it half the default. At SF1000 it
+    # forced q5's lineitem join to partition: 340 GB spilled, 119 s vs 31 s.
+    # Every Sirius row in all_results.csv up to this change used 768 MiB.
+    # Details: docs/engine_spill_plan.md §3.6 (repo root).
+    max_build_hash_table_bytes: 1610612736
+
+  telemetry:
+    enable_quent: false

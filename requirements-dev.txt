@@ -1,0 +1,4 @@
+# Analysis and plotting extras.  The engine itself needs only
+# requirements.txt; these back experiments/ and profiling/.
+matplotlib
+numpy

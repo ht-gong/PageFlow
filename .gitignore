@@ -1,0 +1,28 @@
+__pycache__/
+.venv/
+tmp/
+result*
+build/
+experiments/experiment_mb/*.csv
+experiments/experiment_mb/figures
+experiments/figures
+*egg*
+.pytest_cache
+.vscode
+*.so
+.DS_Store
+debug.out
+*.csv
+scratchpad/
+.claude/
+fig-01-motivation*.png
+# Figures the experiment scripts render (every script writes under a plot/ subfolder)
+experiments/paper_scripts/figures/plot/
+
+# Docker: mounted data + run outputs
+/data/
+/out/
+
+# Box settings, read by the Makefile, bench/run_tqp.sh and baselines/docker/run.sh
+# (copy local.env.example)
+/local.env

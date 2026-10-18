@@ -1,0 +1,8 @@
+# The image holds environments only (the repo is bind-mounted at runtime), so the
+# build context is just the pins and the Docker files.
+*
+!versions.env
+!docker/
+!datagen/ndsgen/Cargo.toml
+!datagen/ndsgen/Cargo.lock
+!datagen/ndsgen/src/

@@ -1,0 +1,52 @@
+{
+  "argv": [
+    "main.py",
+    "--SF",
+    "1",
+    "--q",
+    "9",
+    "--no_debug",
+    "--perf_report",
+    "out/bench/sf1_20261010_083420_2767448/q9"
+  ],
+  "command": "main.py --SF 1 --q 9 --no_debug --perf_report out/bench/sf1_20261010_083420_2767448/q9",
+  "cwd": "/workspace/TQP-Vortex/.claude/worktrees/engine-spill",
+  "timestamp_utc": "2026-10-10T08:34:23.709572Z",
+  "effective": {
+    "cmp_pool_gb": 29,
+    "pinned_pool_gb": 1,
+    "slot_pool_gb": 4.0,
+    "slot_kb": 1024,
+    "buffer_strategy": "cpu",
+    "compression": "adaptive",
+    "compression_search": "off",
+    "sizing_search": "off",
+    "chunk_size_mb": 256,
+    "mask_selectivity": 0.1,
+    "numa_bind": false,
+    "warmup": true
+  },
+  "env": {
+    "CUDA_VISIBLE_DEVICES": "1",
+    "KVIKIO_NTHREADS": "32",
+    "OMP_NUM_THREADS": "32",
+    "TQP_DATA_DIR": "/workspace/tpch-data",
+    "TQP_EXPERIMENT_TELEMETRY": "1",
+    "TQP_GPU": "1",
+    "TQP_NATIVE": "1",
+    "TQP_NUMA_BIND": "0",
+    "TQP_TABLES_PATH": "/workspace/tpch-data"
+  },
+  "codec_map": "source=defaults | codec(unsorted/sorted) int:BITCOMP/CASCADED float:ANS/CASCADED date:BITCOMP/CASCADED string:ANS/ANS | chunk_b ANS=131072 CASCADED=32768 BITCOMP=131072 LZ4=65536 SNAPPY=65536 GDEFLATE=65536 DEFLATE=65536",
+  "versions": {
+    "python": "3.12.3",
+    "torch": "2.8.0+cu128",
+    "cuda": "12.8",
+    "pylibcudf-cu12": "26.6.0",
+    "nvidia-libnvcomp-cu12": "5.2.0.13"
+  },
+  "gpu": {
+    "name": "NVIDIA GeForce RTX 5090",
+    "memory_b": 33766572032
+  }
+}

@@ -1,0 +1,135 @@
+# Captured by parsing/regenerate.py with pyspark 4.2.0. Do not edit; regenerate with `make plans Q=16`.
+== Physical Plan ==
+AdaptiveSparkPlan (21)
++- Sort (20)
+   +- Exchange (19)
+      +- HashAggregate (18)
+         +- Exchange (17)
+            +- HashAggregate (16)
+               +- HashAggregate (15)
+                  +- Exchange (14)
+                     +- HashAggregate (13)
+                        +- Project (12)
+                           +- BroadcastHashJoin Inner BuildLeft (11)
+                              :- BroadcastExchange (8)
+                              :  +- BroadcastHashJoin LeftAnti BuildRight (7)
+                              :     :- Filter (2)
+                              :     :  +- Scan parquet  (1)
+                              :     +- BroadcastExchange (6)
+                              :        +- Project (5)
+                              :           +- Filter (4)
+                              :              +- Scan parquet  (3)
+                              +- Filter (10)
+                                 +- Scan parquet  (9)
+
+
+(1) Scan parquet 
+Output [2]: [ps_partkey#37, ps_suppkey#38]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-partsupp]
+PushedFilters: [IsNotNull(ps_partkey)]
+ReadSchema: struct<ps_partkey:int,ps_suppkey:int>
+
+(2) Filter
+Input [2]: [ps_partkey#37, ps_suppkey#38]
+Condition : isnotnull(ps_partkey#37)
+
+(3) Scan parquet 
+Output [2]: [s_suppkey#25, s_comment#31]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-supplier]
+PushedFilters: [IsNotNull(s_comment)]
+ReadSchema: struct<s_suppkey:int,s_comment:string>
+
+(4) Filter
+Input [2]: [s_suppkey#25, s_comment#31]
+Condition : (isnotnull(s_comment#31) AND s_comment#31 LIKE %Customer%Complaints%)
+
+(5) Project
+Output [1]: [s_suppkey#25]
+Input [2]: [s_suppkey#25, s_comment#31]
+
+(6) BroadcastExchange
+Input [1]: [s_suppkey#25]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),true), [plan_id=205]
+
+(7) BroadcastHashJoin
+Left keys [1]: [ps_suppkey#38]
+Right keys [1]: [s_suppkey#25]
+Join type: LeftAnti
+Join condition: None
+
+(8) BroadcastExchange
+Input [2]: [ps_partkey#37, ps_suppkey#38]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, false] as bigint)),false), [plan_id=208]
+
+(9) Scan parquet 
+Output [4]: [p_partkey#9, p_brand#12, p_type#13, p_size#14]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-part]
+PushedFilters: [IsNotNull(p_brand), IsNotNull(p_type), Not(EqualTo(p_brand,Brand#45)), Not(StringStartsWith(p_type,MEDIUM POLISHED)), In(p_size, [14,19,23,3,36,45,49,9]), IsNotNull(p_partkey)]
+ReadSchema: struct<p_partkey:int,p_brand:string,p_type:string,p_size:int>
+
+(10) Filter
+Input [4]: [p_partkey#9, p_brand#12, p_type#13, p_size#14]
+Condition : (((((isnotnull(p_brand#12) AND isnotnull(p_type#13)) AND NOT (p_brand#12 = Brand#45)) AND NOT StartsWith(p_type#13, MEDIUM POLISHED)) AND p_size#14 IN (49,14,23,45,19,3,36,9)) AND isnotnull(p_partkey#9))
+
+(11) BroadcastHashJoin
+Left keys [1]: [ps_partkey#37]
+Right keys [1]: [p_partkey#9]
+Join type: Inner
+Join condition: None
+
+(12) Project
+Output [4]: [ps_suppkey#38, p_brand#12, p_type#13, p_size#14]
+Input [6]: [ps_partkey#37, ps_suppkey#38, p_partkey#9, p_brand#12, p_type#13, p_size#14]
+
+(13) HashAggregate
+Input [4]: [ps_suppkey#38, p_brand#12, p_type#13, p_size#14]
+Keys [4]: [p_brand#12, p_type#13, p_size#14, ps_suppkey#38]
+Functions: []
+Aggregate Attributes: []
+Results [4]: [p_brand#12, p_type#13, p_size#14, ps_suppkey#38]
+
+(14) Exchange
+Input [4]: [p_brand#12, p_type#13, p_size#14, ps_suppkey#38]
+Arguments: hashpartitioning(p_brand#12, p_type#13, p_size#14, ps_suppkey#38, 200), ENSURE_REQUIREMENTS, [plan_id=213]
+
+(15) HashAggregate
+Input [4]: [p_brand#12, p_type#13, p_size#14, ps_suppkey#38]
+Keys [4]: [p_brand#12, p_type#13, p_size#14, ps_suppkey#38]
+Functions: []
+Aggregate Attributes: []
+Results [4]: [p_brand#12, p_type#13, p_size#14, ps_suppkey#38]
+
+(16) HashAggregate
+Input [4]: [p_brand#12, p_type#13, p_size#14, ps_suppkey#38]
+Keys [3]: [p_brand#12, p_type#13, p_size#14]
+Functions [1]: [partial_count(distinct ps_suppkey#38)]
+Aggregate Attributes [1]: [count(ps_suppkey#38)#124L]
+Results [4]: [p_brand#12, p_type#13, p_size#14, count#127L]
+
+(17) Exchange
+Input [4]: [p_brand#12, p_type#13, p_size#14, count#127L]
+Arguments: hashpartitioning(p_brand#12, p_type#13, p_size#14, 200), ENSURE_REQUIREMENTS, [plan_id=217]
+
+(18) HashAggregate
+Input [4]: [p_brand#12, p_type#13, p_size#14, count#127L]
+Keys [3]: [p_brand#12, p_type#13, p_size#14]
+Functions [1]: [count(distinct ps_suppkey#38)]
+Aggregate Attributes [1]: [count(ps_suppkey#38)#124L]
+Results [4]: [p_brand#12, p_type#13, p_size#14, count(ps_suppkey#38)#124L AS supplier_cnt#122L]
+
+(19) Exchange
+Input [4]: [p_brand#12, p_type#13, p_size#14, supplier_cnt#122L]
+Arguments: rangepartitioning(supplier_cnt#122L DESC NULLS LAST, p_brand#12 ASC NULLS FIRST, p_type#13 ASC NULLS FIRST, p_size#14 ASC NULLS FIRST, 200), ENSURE_REQUIREMENTS, [plan_id=220]
+
+(20) Sort
+Input [4]: [p_brand#12, p_type#13, p_size#14, supplier_cnt#122L]
+Arguments: [supplier_cnt#122L DESC NULLS LAST, p_brand#12 ASC NULLS FIRST, p_type#13 ASC NULLS FIRST, p_size#14 ASC NULLS FIRST], true, 0
+
+(21) AdaptiveSparkPlan
+Output [4]: [p_brand#12, p_type#13, p_size#14, supplier_cnt#122L]
+Arguments: isFinalPlan=false
+
+

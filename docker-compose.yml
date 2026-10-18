@@ -1,0 +1,170 @@
+# TQP-Vortex — every entry point in the repo, containerized.
+#
+#   make smoke               SF1 end-to-end correctness
+#   make test                the full pytest suites (need the SF1 dataset)
+#   make q SF=1 Q="1 6 14"   run queries
+#   make shell               interactive shell with the host source mounted
+#
+# The data root ($TQP_DATA_DIR, mounted read-only at /data/tables) holds each
+# dataset's parquet, sf<sf>/parquet (`make data SF=<sf>`, which runs
+# baselines/ in its own image).
+#
+# Every service is one-shot (`docker compose run`), so they all sit behind a
+# profile and a bare `docker compose up` starts nothing.
+#
+# ── Host settings these services encode, and why ────────────────────────────
+#   ulimits.memlock: -1   main.py pins ~0.69 GB of host RAM per scale factor
+#                         (_pinned_capacity_gb); the default 64 MB limit
+#                         fails it.
+#   ipc: host             torch's shared-memory allocator.
+#   device_ids            exactly ONE GPU is exposed, as CUDA device 0, which
+#                         main.py uses (and names to nvidia-smi by its PCI bus
+#                         id).  Choose the physical device with TQP_GPU.
+#   no cpuset             main.py pins its threads to the GPU's NUMA node,
+#                         intersected with the container's affinity mask;
+#                         narrowing it silently moves a timed run off that node.
+#   cap_add: SYS_NICE     main.py binds the pinned host pool to the GPU's NUMA
+#                         node with mbind(2), which Docker's default seccomp
+#                         profile allows only with CAP_SYS_NICE.
+
+name: tqp-vortex
+
+# The codec map (profiling/results/codec_map.json) is written by the
+# `profiling` service and read by compression/format_policy.py in every
+# engine-image container.  It lives on the host, never in the image
+# (.dockerignore excludes profiling/results), so this read-only mount carries
+# it into engine, test, experiments and spark; dev already sees it through its
+# working-tree mount (a read-only alias there would stop the sweep from
+# writing through dev).
+x-codec-map: &codec_map_ro ./profiling/results:/opt/TQP-Vortex/profiling/results:ro
+
+# The data root the scan reads (TQP_TABLES_PATH).
+x-tables: &tables_ro "${TQP_DATA_DIR:-./data}:/data/tables:ro"
+
+x-engine: &engine
+  image: tqp-vortex:latest
+  build:
+    context: .
+    target: engine
+    args:
+      CUDA_ARCHITECTURES: "${CUDA_ARCHITECTURES:-80;86;89;90}"
+  working_dir: /opt/TQP-Vortex
+  ipc: host
+  cap_add:
+    - SYS_NICE
+  ulimits:
+    memlock: -1
+    stack: 67108864
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            device_ids: ["${TQP_GPU:-0}"]
+            capabilities: [gpu]
+  environment:
+    TQP_TABLES_PATH: /data/tables
+    TQP_OUT_DIR: /opt/TQP-Vortex/out
+    OMP_NUM_THREADS: "${OMP_NUM_THREADS:-32}"
+  volumes:
+    - *tables_ro
+    - ./out:/opt/TQP-Vortex/out
+    - *codec_map_ro
+
+services:
+
+  # ── Core: the engine and its test suites ────────────────────────────────
+
+  # `make q` / `make run` — python main.py ...
+  engine:
+    <<: *engine
+    profiles: ["run"]
+
+  # `make test` — every suite under tests/.
+  test:
+    <<: *engine
+    profiles: ["run"]
+    command: ["python3", "test.py"]
+
+  # `make shell` — host source mounted, so edits take effect without a rebuild.
+  # build/ lives on a named volume (seeded from the image on first use) rather
+  # than in the mount, so a host conda build tree and the container's cannot
+  # overwrite each other.  The entrypoint restores TQPlib/*/*.so, which the
+  # mount shadows.
+  dev:
+    <<: *engine
+    profiles: ["dev"]
+    volumes:
+      - .:/opt/TQP-Vortex
+      - tqp-build:/opt/TQP-Vortex/build
+      - *tables_ro
+    stdin_open: true
+    tty: true
+    command: ["bash"]
+
+  # ── Analysis ────────────────────────────────────────────────────────────
+
+  # `make profiling` — the offline codec sweep (profiling/sweep.py): every
+  # codec x nvCOMP chunk on the SF5 columns the 22 queries scan, through the
+  # engine's own compress path.  Needs the SF5 parquet.  Writes
+  # profiling/results/codec_map.json, which every other service mounts
+  # read-only.
+  profiling:
+    <<: *engine
+    profiles: ["tools"]
+    volumes:
+      - *tables_ro
+      - ./out:/opt/TQP-Vortex/out
+      - ./profiling/results:/opt/TQP-Vortex/profiling/results
+    command: ["python3", "-m", "profiling.sweep"]
+
+  # `make experiments SCRIPT=... ` — sweeps and figure generation.  The whole
+  # experiments/ tree is mounted so figures and CSVs land on the host;
+  # baselines/results read-only for the engine comparison's results
+  # (scaling_study.py --refresh), since the image leaves baselines/ out.
+  experiments:
+    <<: *engine
+    profiles: ["tools"]
+    volumes:
+      - *tables_ro
+      - ./out:/opt/TQP-Vortex/out
+      - ./experiments:/opt/TQP-Vortex/experiments
+      - ./baselines/results:/opt/TQP-Vortex/baselines/results:ro
+      - *codec_map_ro
+    command: ["bash"]
+
+  # `make spark` — Spark plan parsing (parsing/layer.py).  CPU + JDK only, so
+  # no device reservation; queries/ is mounted for regenerated plan-q*.txt.
+  spark:
+    <<: *engine
+    profiles: ["tools"]
+    deploy: {}
+    environment:
+      TQP_SKIP_PREFLIGHT: "1"
+      TQP_OUT_DIR: /opt/TQP-Vortex/out
+    volumes:
+      - ./out:/opt/TQP-Vortex/out
+      - ./queries:/opt/TQP-Vortex/queries
+      - *codec_map_ro
+    stdin_open: true
+    tty: true
+    command: ["bash"]
+
+  # `make plans Q="20"` — capture queries/plan-q*.txt with Spark (the pinned
+  # pyspark, one fresh JVM per query) and lower it to queries/pickles/*.pkl
+  # (parsing/regenerate.py).  CPU + JDK only.  Runs the working tree and writes
+  # into it.
+  plans:
+    <<: *engine
+    profiles: ["tools"]
+    deploy: {}
+    environment:
+      TQP_SKIP_PREFLIGHT: "1"
+      TQP_OUT_DIR: /opt/TQP-Vortex/out
+    volumes:
+      - .:/opt/TQP-Vortex
+      - tqp-build:/opt/TQP-Vortex/build
+    command: ["python3", "-m", "parsing.regenerate"]
+
+volumes:
+  tqp-build:

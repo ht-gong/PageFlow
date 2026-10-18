@@ -1,0 +1,94 @@
+# Captured by parsing/regenerate.py with pyspark 4.2.0. Do not edit; regenerate with `make plans Q=4`.
+== Physical Plan ==
+AdaptiveSparkPlan (15)
++- Sort (14)
+   +- Exchange (13)
+      +- HashAggregate (12)
+         +- Exchange (11)
+            +- HashAggregate (10)
+               +- Project (9)
+                  +- BroadcastHashJoin LeftSemi BuildRight (8)
+                     :- Project (3)
+                     :  +- Filter (2)
+                     :     +- Scan parquet  (1)
+                     +- BroadcastExchange (7)
+                        +- Project (6)
+                           +- Filter (5)
+                              +- Scan parquet  (4)
+
+
+(1) Scan parquet 
+Output [3]: [o_orderkey#67, o_orderdate#71, o_orderpriority#72]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-orders]
+PushedFilters: [IsNotNull(o_orderdate), GreaterThanOrEqual(o_orderdate,1993-07-01), LessThan(o_orderdate,1993-10-01)]
+ReadSchema: struct<o_orderkey:int,o_orderdate:date,o_orderpriority:string>
+
+(2) Filter
+Input [3]: [o_orderkey#67, o_orderdate#71, o_orderpriority#72]
+Condition : ((isnotnull(o_orderdate#71) AND (o_orderdate#71 >= 1993-07-01)) AND (o_orderdate#71 < 1993-10-01))
+
+(3) Project
+Output [2]: [o_orderkey#67, o_orderpriority#72]
+Input [3]: [o_orderkey#67, o_orderdate#71, o_orderpriority#72]
+
+(4) Scan parquet 
+Output [3]: [l_orderkey#92, l_commitdate#103, l_receiptdate#104]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-lineitem]
+PushedFilters: [IsNotNull(l_commitdate), IsNotNull(l_receiptdate)]
+ReadSchema: struct<l_orderkey:int,l_commitdate:date,l_receiptdate:date>
+
+(5) Filter
+Input [3]: [l_orderkey#92, l_commitdate#103, l_receiptdate#104]
+Condition : ((isnotnull(l_commitdate#103) AND isnotnull(l_receiptdate#104)) AND (l_commitdate#103 < l_receiptdate#104))
+
+(6) Project
+Output [1]: [l_orderkey#92]
+Input [3]: [l_orderkey#92, l_commitdate#103, l_receiptdate#104]
+
+(7) BroadcastExchange
+Input [1]: [l_orderkey#92]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=179]
+
+(8) BroadcastHashJoin
+Left keys [1]: [o_orderkey#67]
+Right keys [1]: [l_orderkey#92]
+Join type: LeftSemi
+Join condition: None
+
+(9) Project
+Output [1]: [o_orderpriority#72]
+Input [2]: [o_orderkey#67, o_orderpriority#72]
+
+(10) HashAggregate
+Input [1]: [o_orderpriority#72]
+Keys [1]: [o_orderpriority#72]
+Functions [1]: [partial_count(1)]
+Aggregate Attributes [1]: [count#125L]
+Results [2]: [o_orderpriority#72, count#126L]
+
+(11) Exchange
+Input [2]: [o_orderpriority#72, count#126L]
+Arguments: hashpartitioning(o_orderpriority#72, 200), ENSURE_REQUIREMENTS, [plan_id=184]
+
+(12) HashAggregate
+Input [2]: [o_orderpriority#72, count#126L]
+Keys [1]: [o_orderpriority#72]
+Functions [1]: [count(1)]
+Aggregate Attributes [1]: [count(1)#124L]
+Results [2]: [o_orderpriority#72, count(1)#124L AS order_count#122L]
+
+(13) Exchange
+Input [2]: [o_orderpriority#72, order_count#122L]
+Arguments: rangepartitioning(o_orderpriority#72 ASC NULLS FIRST, 200), ENSURE_REQUIREMENTS, [plan_id=187]
+
+(14) Sort
+Input [2]: [o_orderpriority#72, order_count#122L]
+Arguments: [o_orderpriority#72 ASC NULLS FIRST], true, 0
+
+(15) AdaptiveSparkPlan
+Output [2]: [o_orderpriority#72, order_count#122L]
+Arguments: isFinalPlan=false
+
+

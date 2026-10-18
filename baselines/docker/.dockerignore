@@ -1,0 +1,11 @@
+# Keep the build context tiny: only Dockerfile + app/ + scripts/ are needed.
+data/
+**/results/
+**/*.parquet
+**/*.tbl
+**/*.log
+**/__pycache__/
+*.csv
+README.md
+docker-compose.yml
+run.sh

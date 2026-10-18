@@ -1,0 +1,79 @@
+# Captured by parsing/regenerate.py with pyspark 4.2.0. Do not edit; regenerate with `make plans Q=19`.
+== Physical Plan ==
+AdaptiveSparkPlan (12)
++- HashAggregate (11)
+   +- Exchange (10)
+      +- HashAggregate (9)
+         +- Project (8)
+            +- BroadcastHashJoin Inner BuildLeft (7)
+               :- BroadcastExchange (4)
+               :  +- Project (3)
+               :     +- Filter (2)
+               :        +- Scan parquet  (1)
+               +- Filter (6)
+                  +- Scan parquet  (5)
+
+
+(1) Scan parquet 
+Output [6]: [l_partkey#93, l_quantity#96, l_extendedprice#97, l_discount#98, l_shipinstruct#105, l_shipmode#106]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-lineitem]
+PushedFilters: [IsNotNull(l_shipinstruct), In(l_shipmode, [AIR,AIR REG]), EqualTo(l_shipinstruct,DELIVER IN PERSON), IsNotNull(l_partkey), Or(Or(And(GreaterThanOrEqual(l_quantity,1),LessThanOrEqual(l_quantity,11)),And(GreaterThanOrEqual(l_quantity,10),LessThanOrEqual(l_quantity,20))),And(GreaterThanOrEqual(l_quantity,20),LessThanOrEqual(l_quantity,30)))]
+ReadSchema: struct<l_partkey:int,l_quantity:int,l_extendedprice:double,l_discount:double,l_shipinstruct:string,l_shipmode:string>
+
+(2) Filter
+Input [6]: [l_partkey#93, l_quantity#96, l_extendedprice#97, l_discount#98, l_shipinstruct#105, l_shipmode#106]
+Condition : ((((isnotnull(l_shipinstruct#105) AND l_shipmode#106 IN (AIR,AIR REG)) AND (l_shipinstruct#105 = DELIVER IN PERSON)) AND isnotnull(l_partkey#93)) AND ((((l_quantity#96 >= 1) AND (l_quantity#96 <= 11)) OR ((l_quantity#96 >= 10) AND (l_quantity#96 <= 20))) OR ((l_quantity#96 >= 20) AND (l_quantity#96 <= 30))))
+
+(3) Project
+Output [4]: [l_partkey#93, l_quantity#96, l_extendedprice#97, l_discount#98]
+Input [6]: [l_partkey#93, l_quantity#96, l_extendedprice#97, l_discount#98, l_shipinstruct#105, l_shipmode#106]
+
+(4) BroadcastExchange
+Input [4]: [l_partkey#93, l_quantity#96, l_extendedprice#97, l_discount#98]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=179]
+
+(5) Scan parquet 
+Output [4]: [p_partkey#9, p_brand#12, p_size#14, p_container#15]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-part]
+PushedFilters: [IsNotNull(p_size), GreaterThanOrEqual(p_size,1), IsNotNull(p_partkey), Or(Or(And(And(EqualTo(p_brand,Brand#12),In(p_container, [SM BOX,SM CASE,SM PACK,SM PKG])),LessThanOrEqual(p_size,5)),And(And(EqualTo(p_brand,Brand#23),In(p_container, [MED BAG,MED BOX,MED PACK,MED PKG])),LessThanOrEqual(p_size,10))),And(And(EqualTo(p_brand,Brand#34),In(p_container, [LG BOX,LG CASE,LG PACK,LG PKG])),LessThanOrEqual(p_size,15)))]
+ReadSchema: struct<p_partkey:int,p_brand:string,p_size:int,p_container:string>
+
+(6) Filter
+Input [4]: [p_partkey#9, p_brand#12, p_size#14, p_container#15]
+Condition : (((isnotnull(p_size#14) AND (p_size#14 >= 1)) AND isnotnull(p_partkey#9)) AND (((((p_brand#12 = Brand#12) AND p_container#15 IN (SM CASE,SM BOX,SM PACK,SM PKG)) AND (p_size#14 <= 5)) OR (((p_brand#12 = Brand#23) AND p_container#15 IN (MED BAG,MED BOX,MED PKG,MED PACK)) AND (p_size#14 <= 10))) OR (((p_brand#12 = Brand#34) AND p_container#15 IN (LG CASE,LG BOX,LG PACK,LG PKG)) AND (p_size#14 <= 15))))
+
+(7) BroadcastHashJoin
+Left keys [1]: [l_partkey#93]
+Right keys [1]: [p_partkey#9]
+Join type: Inner
+Join condition: (((((((p_brand#12 = Brand#12) AND p_container#15 IN (SM CASE,SM BOX,SM PACK,SM PKG)) AND (l_quantity#96 >= 1)) AND (l_quantity#96 <= 11)) AND (p_size#14 <= 5)) OR (((((p_brand#12 = Brand#23) AND p_container#15 IN (MED BAG,MED BOX,MED PKG,MED PACK)) AND (l_quantity#96 >= 10)) AND (l_quantity#96 <= 20)) AND (p_size#14 <= 10))) OR (((((p_brand#12 = Brand#34) AND p_container#15 IN (LG CASE,LG BOX,LG PACK,LG PKG)) AND (l_quantity#96 >= 20)) AND (l_quantity#96 <= 30)) AND (p_size#14 <= 15)))
+
+(8) Project
+Output [2]: [l_extendedprice#97, l_discount#98]
+Input [8]: [l_partkey#93, l_quantity#96, l_extendedprice#97, l_discount#98, p_partkey#9, p_brand#12, p_size#14, p_container#15]
+
+(9) HashAggregate
+Input [2]: [l_extendedprice#97, l_discount#98]
+Keys: []
+Functions [1]: [partial_sum((l_extendedprice#97 * (1.0 - l_discount#98)))]
+Aggregate Attributes [1]: [sum#124]
+Results [1]: [sum#125]
+
+(10) Exchange
+Input [1]: [sum#125]
+Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=184]
+
+(11) HashAggregate
+Input [1]: [sum#125]
+Keys: []
+Functions [1]: [sum((l_extendedprice#97 * (1.0 - l_discount#98)))]
+Aggregate Attributes [1]: [sum((l_extendedprice#97 * (1.0 - l_discount#98)))#123]
+Results [1]: [sum((l_extendedprice#97 * (1.0 - l_discount#98)))#123 AS revenue#122]
+
+(12) AdaptiveSparkPlan
+Output [1]: [revenue#122]
+Arguments: isFinalPlan=false
+
+

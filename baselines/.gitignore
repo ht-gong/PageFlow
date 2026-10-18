@@ -1,0 +1,54 @@
+# The TQP-Vortex root ignores result* and *.csv. Re-include them here, before
+# every other pattern, so the patterns below still win.
+!result*
+!*.csv
+
+# pulled repo
+dpfproto/data
+dpfproto/logs/
+
+.venv/
+
+# ---- benchmark intermediates: results/all_results.csv is the ONLY kept TPC-H
+# results file; every per-run / per-SF / detail CSV is a throwaway (runners merge
+# into all_results.csv via merge_results.py and delete their temp). The format
+# profiling pass keeps results/format_profile.csv and results/format_map.json.
+results/query_times_*.csv
+results/*_logs/
+**/_raw/
+**/_tmp/
+**/_tmp_pq/
+**/_work/
+_spark_scratch/
+_polars_scratch_gpu/
+
+# ---- python venvs & caches ----
+polars/.venv-gpu
+**/__pycache__/
+*.pyc
+
+# ---- large binaries / envs (re-downloadable, see READMEs) ----
+rapids/jars/
+rapids/env/
+
+# ---- upstream clones ----
+# the sirius clone + its .pixi build env (setup_sirius.sh recreates it)
+/sirius/sirius
+
+# ---- sirius spill scratch ----
+_sirius_spill/
+
+# ---- run logs / captures ----
+*.log
+*.out
+
+# symlink onto the NVMe (see AGENTS.md) and the format profiling pass's
+# per-worker logs
+_polars_scratch_gpu
+results/format_profile_logs/
+
+# ---- local planning notes (not committed) ----
+/docs/docker_migration_plan.md
+
+# ---- the spill builders' test fixtures are evidence, logs included ----
+!tests/fixtures/**/*.log

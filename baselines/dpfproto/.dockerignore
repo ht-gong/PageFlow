@@ -1,0 +1,13 @@
+.venv
+data
+logs
+DPFProto/build
+DPFProto/cuda-samples
+DPFProto/cuda-samples
+DPFProto/**/build
+DPFProto/**/.cache
+DPFProto/**/*.o
+DPFProto/**/*.a
+DPFProto/**/*.so
+DPFProto/**/*.so.*
+DPFProto/.git

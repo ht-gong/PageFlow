@@ -1,0 +1,209 @@
+# Captured by parsing/regenerate.py with pyspark 4.2.0. Do not edit; regenerate with `make plans Q=9`.
+== Physical Plan ==
+AdaptiveSparkPlan (34)
++- Sort (33)
+   +- Exchange (32)
+      +- HashAggregate (31)
+         +- Exchange (30)
+            +- HashAggregate (29)
+               +- Project (28)
+                  +- BroadcastHashJoin Inner BuildRight (27)
+                     :- Project (23)
+                     :  +- BroadcastHashJoin Inner BuildRight (22)
+                     :     :- Project (18)
+                     :     :  +- BroadcastHashJoin Inner BuildRight (17)
+                     :     :     :- Project (13)
+                     :     :     :  +- BroadcastHashJoin Inner BuildRight (12)
+                     :     :     :     :- Project (8)
+                     :     :     :     :  +- BroadcastHashJoin Inner BuildLeft (7)
+                     :     :     :     :     :- BroadcastExchange (4)
+                     :     :     :     :     :  +- Project (3)
+                     :     :     :     :     :     +- Filter (2)
+                     :     :     :     :     :        +- Scan parquet  (1)
+                     :     :     :     :     +- Filter (6)
+                     :     :     :     :        +- Scan parquet  (5)
+                     :     :     :     +- BroadcastExchange (11)
+                     :     :     :        +- Filter (10)
+                     :     :     :           +- Scan parquet  (9)
+                     :     :     +- BroadcastExchange (16)
+                     :     :        +- Filter (15)
+                     :     :           +- Scan parquet  (14)
+                     :     +- BroadcastExchange (21)
+                     :        +- Filter (20)
+                     :           +- Scan parquet  (19)
+                     +- BroadcastExchange (26)
+                        +- Filter (25)
+                           +- Scan parquet  (24)
+
+
+(1) Scan parquet 
+Output [2]: [p_partkey#9, p_name#10]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-part]
+PushedFilters: [IsNotNull(p_name), StringContains(p_name,green), IsNotNull(p_partkey)]
+ReadSchema: struct<p_partkey:int,p_name:string>
+
+(2) Filter
+Input [2]: [p_partkey#9, p_name#10]
+Condition : ((isnotnull(p_name#10) AND Contains(p_name#10, green)) AND isnotnull(p_partkey#9))
+
+(3) Project
+Output [1]: [p_partkey#9]
+Input [2]: [p_partkey#9, p_name#10]
+
+(4) BroadcastExchange
+Input [1]: [p_partkey#9]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=256]
+
+(5) Scan parquet 
+Output [6]: [l_orderkey#92, l_partkey#93, l_suppkey#94, l_quantity#96, l_extendedprice#97, l_discount#98]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-lineitem]
+PushedFilters: [IsNotNull(l_partkey), IsNotNull(l_suppkey), IsNotNull(l_orderkey)]
+ReadSchema: struct<l_orderkey:int,l_partkey:int,l_suppkey:int,l_quantity:int,l_extendedprice:double,l_discount:double>
+
+(6) Filter
+Input [6]: [l_orderkey#92, l_partkey#93, l_suppkey#94, l_quantity#96, l_extendedprice#97, l_discount#98]
+Condition : ((isnotnull(l_partkey#93) AND isnotnull(l_suppkey#94)) AND isnotnull(l_orderkey#92))
+
+(7) BroadcastHashJoin
+Left keys [1]: [p_partkey#9]
+Right keys [1]: [l_partkey#93]
+Join type: Inner
+Join condition: None
+
+(8) Project
+Output [6]: [l_orderkey#92, l_partkey#93, l_suppkey#94, l_quantity#96, l_extendedprice#97, l_discount#98]
+Input [7]: [p_partkey#9, l_orderkey#92, l_partkey#93, l_suppkey#94, l_quantity#96, l_extendedprice#97, l_discount#98]
+
+(9) Scan parquet 
+Output [2]: [s_suppkey#25, s_nationkey#28]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-supplier]
+PushedFilters: [IsNotNull(s_suppkey), IsNotNull(s_nationkey)]
+ReadSchema: struct<s_suppkey:int,s_nationkey:int>
+
+(10) Filter
+Input [2]: [s_suppkey#25, s_nationkey#28]
+Condition : (isnotnull(s_suppkey#25) AND isnotnull(s_nationkey#28))
+
+(11) BroadcastExchange
+Input [2]: [s_suppkey#25, s_nationkey#28]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, false] as bigint)),false), [plan_id=260]
+
+(12) BroadcastHashJoin
+Left keys [1]: [l_suppkey#94]
+Right keys [1]: [s_suppkey#25]
+Join type: Inner
+Join condition: None
+
+(13) Project
+Output [7]: [l_orderkey#92, l_partkey#93, l_suppkey#94, l_quantity#96, l_extendedprice#97, l_discount#98, s_nationkey#28]
+Input [8]: [l_orderkey#92, l_partkey#93, l_suppkey#94, l_quantity#96, l_extendedprice#97, l_discount#98, s_suppkey#25, s_nationkey#28]
+
+(14) Scan parquet 
+Output [2]: [o_orderkey#67, o_orderdate#71]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-orders]
+PushedFilters: [IsNotNull(o_orderkey)]
+ReadSchema: struct<o_orderkey:int,o_orderdate:date>
+
+(15) Filter
+Input [2]: [o_orderkey#67, o_orderdate#71]
+Condition : isnotnull(o_orderkey#67)
+
+(16) BroadcastExchange
+Input [2]: [o_orderkey#67, o_orderdate#71]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, false] as bigint)),false), [plan_id=264]
+
+(17) BroadcastHashJoin
+Left keys [1]: [l_orderkey#92]
+Right keys [1]: [o_orderkey#67]
+Join type: Inner
+Join condition: None
+
+(18) Project
+Output [7]: [l_partkey#93, l_suppkey#94, l_quantity#96, l_extendedprice#97, l_discount#98, s_nationkey#28, o_orderdate#71]
+Input [9]: [l_orderkey#92, l_partkey#93, l_suppkey#94, l_quantity#96, l_extendedprice#97, l_discount#98, s_nationkey#28, o_orderkey#67, o_orderdate#71]
+
+(19) Scan parquet 
+Output [3]: [ps_partkey#37, ps_suppkey#38, ps_supplycost#40]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-partsupp]
+PushedFilters: [IsNotNull(ps_suppkey), IsNotNull(ps_partkey)]
+ReadSchema: struct<ps_partkey:int,ps_suppkey:int,ps_supplycost:double>
+
+(20) Filter
+Input [3]: [ps_partkey#37, ps_suppkey#38, ps_supplycost#40]
+Condition : (isnotnull(ps_suppkey#38) AND isnotnull(ps_partkey#37))
+
+(21) BroadcastExchange
+Input [3]: [ps_partkey#37, ps_suppkey#38, ps_supplycost#40]
+Arguments: HashedRelationBroadcastMode(List((shiftleft(cast(input[1, int, false] as bigint), 32) | (cast(input[0, int, false] as bigint) & 4294967295))),false), [plan_id=268]
+
+(22) BroadcastHashJoin
+Left keys [2]: [l_suppkey#94, l_partkey#93]
+Right keys [2]: [ps_suppkey#38, ps_partkey#37]
+Join type: Inner
+Join condition: None
+
+(23) Project
+Output [6]: [l_quantity#96, l_extendedprice#97, l_discount#98, s_nationkey#28, o_orderdate#71, ps_supplycost#40]
+Input [10]: [l_partkey#93, l_suppkey#94, l_quantity#96, l_extendedprice#97, l_discount#98, s_nationkey#28, o_orderdate#71, ps_partkey#37, ps_suppkey#38, ps_supplycost#40]
+
+(24) Scan parquet 
+Output [2]: [n_nationkey#112, n_name#113]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-nation]
+PushedFilters: [IsNotNull(n_nationkey)]
+ReadSchema: struct<n_nationkey:int,n_name:string>
+
+(25) Filter
+Input [2]: [n_nationkey#112, n_name#113]
+Condition : isnotnull(n_nationkey#112)
+
+(26) BroadcastExchange
+Input [2]: [n_nationkey#112, n_name#113]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, false] as bigint)),false), [plan_id=272]
+
+(27) BroadcastHashJoin
+Left keys [1]: [s_nationkey#28]
+Right keys [1]: [n_nationkey#112]
+Join type: Inner
+Join condition: None
+
+(28) Project
+Output [3]: [((l_extendedprice#97 * (1.0 - l_discount#98)) - (ps_supplycost#40 * cast(l_quantity#96 as double))) AS amount#122, n_name#113 AS nation#123, year(o_orderdate#71) AS o_year#124]
+Input [8]: [l_quantity#96, l_extendedprice#97, l_discount#98, s_nationkey#28, o_orderdate#71, ps_supplycost#40, n_nationkey#112, n_name#113]
+
+(29) HashAggregate
+Input [3]: [amount#122, nation#123, o_year#124]
+Keys [2]: [nation#123, o_year#124]
+Functions [1]: [partial_sum(amount#122)]
+Aggregate Attributes [1]: [sum#127]
+Results [3]: [nation#123, o_year#124, sum#128]
+
+(30) Exchange
+Input [3]: [nation#123, o_year#124, sum#128]
+Arguments: hashpartitioning(nation#123, o_year#124, 200), ENSURE_REQUIREMENTS, [plan_id=277]
+
+(31) HashAggregate
+Input [3]: [nation#123, o_year#124, sum#128]
+Keys [2]: [nation#123, o_year#124]
+Functions [1]: [sum(amount#122)]
+Aggregate Attributes [1]: [sum(amount#122)#126]
+Results [3]: [nation#123, o_year#124, sum(amount#122)#126 AS sum_profit#125]
+
+(32) Exchange
+Input [3]: [nation#123, o_year#124, sum_profit#125]
+Arguments: rangepartitioning(nation#123 ASC NULLS FIRST, o_year#124 DESC NULLS LAST, 200), ENSURE_REQUIREMENTS, [plan_id=280]
+
+(33) Sort
+Input [3]: [nation#123, o_year#124, sum_profit#125]
+Arguments: [nation#123 ASC NULLS FIRST, o_year#124 DESC NULLS LAST], true, 0
+
+(34) AdaptiveSparkPlan
+Output [3]: [nation#123, o_year#124, sum_profit#125]
+Arguments: isFinalPlan=false
+
+

@@ -1,0 +1,382 @@
+# polars env lock: cudf-polars (polars_gpu), CUDA 13 wheels. Installed with --require-hashes --no-deps
+# and --extra-index-url https://pypi.nvidia.com. Pinned from the host env the SF500/SF100 results used,
+# plus nvidia-nvjitlink-cu12==12.9.86: libcudf loads libnvJitLink at import, and the host env got it
+# from the system CUDA 12.9 install (/usr/local/cuda-12.9, 12.9.86), outside the venv.
+# Regenerate (only as part of a deliberate version bump):
+#   uv pip compile --python-version 3.12 --python-platform x86_64-manylinux_2_39 --generate-hashes \
+#     --extra-index-url https://pypi.nvidia.com --index-strategy unsafe-best-match polars.in
+# with polars.in = the `pip freeze` of the env to pin, plus the nvjitlink line.
+cuda-bindings==13.4.2 \
+    --hash=sha256:11e8dadde03e8c00557d87c496e230aa196c03f68b89c375ed340fc4928e5190 \
+    --hash=sha256:19697badd5b76ce31e264e214825eb24bf77c8bfd49eabf90c5c50c2751ef43a \
+    --hash=sha256:1d3a142899bf887287417a7e0e76c9a859dfa8b344526a7a45b9c0657298f371 \
+    --hash=sha256:251057d5cee0e015c6586332684f66c4f6e1af5cac91b99520fca44250d877a8 \
+    --hash=sha256:3c0415cf8fb98fbae3eb65079f151e10b9764ac2d5970027a49dc5a627c2af9d \
+    --hash=sha256:40c811caf26976eb319462db614422112438f1d02b4f3df3a4a96f9bbcc77b6d \
+    --hash=sha256:50e68c36222a58d271fbd2e23149497d35450a911d792d49a029e58519abb7e5 \
+    --hash=sha256:663dafd7a6db60837a7bab8cd370431b7989caa98721191631f58fb457477127 \
+    --hash=sha256:6a59dc6ce2c5691f7de017751ff3dbf510decf8772eaba9b0516f84da233fb35 \
+    --hash=sha256:6b1a0f7a676989396566c40566b8ef47a5d208fd5263f45ada6225d25f9113dd \
+    --hash=sha256:70cc99896a6f95f1956e177143653f9c4215b1d70aa886259e569209256c0fe8 \
+    --hash=sha256:75729fb787224dba93d1aa2bd08d29220aaa5a685a1b4e18e22c49818dfcee46 \
+    --hash=sha256:7f112b717c8d15ffdf9e44e4d8725886a8b7fb95ee0a437fdc726c596fec5634 \
+    --hash=sha256:82454da78ed5b0b820d4f73def297daeb3c159cb5ac5821adb9bcf313a188d91 \
+    --hash=sha256:b43902b9348f7a9ff5a5072854730182a4565dc05a031d0e2121aa9a4aa1a395 \
+    --hash=sha256:bb2e91717c83ea550ef1b19ebafd25c9fe805478f479d04b3fc798cc6d29d453 \
+    --hash=sha256:ddafc5e60af19c2fec4673e24e9ba2bcff51651afc4603c4e6b4ef53ccdb58c7 \
+    --hash=sha256:df64af24ea9818147a58ea7647e3f684cbed6793baf1fbecfad1629038b8046f \
+    --hash=sha256:e73b6ae6592194a5ba01ec1f5f4fe4c8dc05b5f90545842ba5ff996f65328553 \
+    --hash=sha256:ee4b19ef6621679d73ac056bcb41fe04e58fba6d521c1ea16a390a9f73fa31c3 \
+    --hash=sha256:f8d58c37157b3c83a57546c6eca284c3b36c7552bbc3b285ab0a7ec8b2636afc \
+    --hash=sha256:fc0a18f65b26459cd3c49c0250a44b419cdf790cffcb096ff4d46a1973f6f4b7 \
+    --hash=sha256:fef0b46c1300597a6df319a457525b0f6e7dd4f59aa809a193fcfd7a26ee50f9
+    # via
+    #   -r polars2.in
+    #   cuda-python
+cuda-core==1.2.0 \
+    --hash=sha256:0dddba476d990c62a17b58b2c198a3b2768d575987577febda8f3e88140df192 \
+    --hash=sha256:23073bfe5087d55b6b3e674481b546efb3bfe106642a868972084b95b7860e7b \
+    --hash=sha256:248117d2d8160ba052b49c60ed4e6c970e8fcdc311ef9523a086dc4574d40c77 \
+    --hash=sha256:29ec78a8a45ad029e8d31b0ee67fe658964efc97a0176eb9d7ad354677116923 \
+    --hash=sha256:2a77d40f613e4d151f4466818d1baab271237122c7240450fe66fe8a071ff86f \
+    --hash=sha256:419e884cbe26d85936c8ffea27865a6f2589677f34a81eecb0fe1ec3715c06a0 \
+    --hash=sha256:4206c19f3c787c6dd4fdce3625e842686dc73ba665d46d16d6c57659a94db0ac \
+    --hash=sha256:72b2466e547e177a04ddfc036e3abf51a20b2281febe5d1fb5af3e7fc07ddce5 \
+    --hash=sha256:755125ec04d0a153a726b040e3048325b2f1c6d495ef9a124584689e219774f6 \
+    --hash=sha256:78b38f478775de6894c4c239ff0cdd5e0464165a2905a5bbf0359d8d9e5acd11 \
+    --hash=sha256:c4228d27af1993f8516b51db6c74846ebd1f772bb34132ee721da61369b7febd \
+    --hash=sha256:c80d766c86d2c9e43674d4ba734450b7708eab3fab52f3757be339b8d6948466 \
+    --hash=sha256:ccfd9905e43dc5ef0f88e26a3e3f1509d84c0306710dec351c5ab1db0da5752e \
+    --hash=sha256:cd36063535f75a88c4eb44ba9a678441491a5f67a72f62c2e3b797e8a052d438 \
+    --hash=sha256:e138be12af795c69c1cb61e38562ea70e5a38616b2753e2a265231f1941394ef \
+    --hash=sha256:f19593699a49a52d08300d44c1c84db8629dc01702b36336401c0ba87fe5067f \
+    --hash=sha256:f4be442b2f79f3c8232824e0499fd6a8ef30244fd0b344e14ab75034b3e50de1 \
+    --hash=sha256:f81b3728fedcab49daba69bc666e1307c62c1ad8d82b0d6616f6b878b2e20c5f
+    # via
+    #   -r polars2.in
+    #   cuda-python
+    #   ucxx-cu13
+cuda-pathfinder==1.8.2 \
+    --hash=sha256:4e65059febdb4d19d5cbc4798677e19db2b582f2f702f457b609e571690d357e
+    # via
+    #   -r polars2.in
+    #   cuda-bindings
+    #   cuda-core
+    #   cuda-python
+    #   cupy-cuda13x
+cuda-python==13.4.1 \
+    --hash=sha256:b6b114882beb8325139a318a02bcf8feb821dfd724f6f6104c262e2d1e2035ef
+    # via
+    #   -r polars2.in
+    #   cudf-polars-cu13
+    #   pylibcudf-cu13
+    #   rapidsmpf-cu13
+    #   rmm-cu13
+cudf-polars-cu13==26.6.0 \
+    --hash=sha256:abf9d56f87a7fc61acf52aa59cc05dea36bc79056a0322a34cb0f7f469c74e7f
+    # via -r polars2.in
+cupy-cuda13x==14.2.0 \
+    --hash=sha256:006987701f5b9e248c357358159c9e38252b38dbb65fbc7ec15dc38d04fca462 \
+    --hash=sha256:0a9b6538079c5151dcd99cf44b94cc3f1242315b7de0498b4619cef9b2a7c2c8 \
+    --hash=sha256:0dae6d788752c987c1cd87adb903640620820feb895339e8bc51a01fba0fb804 \
+    --hash=sha256:313500c5d415f65d388e84a9d2eb7f07f97c23c85dc5785f986e75d46d9c9693 \
+    --hash=sha256:351e33aa4260dd89359b243cc8ce3ee76c08e4ed4d1bafaaaec2b882f42e59f8 \
+    --hash=sha256:3893acd8d4dc78d113736045eaa306e496ee7bd8253bd959513ba28c91ed396d \
+    --hash=sha256:449af7f608dc70ce64e8c45cf5a6ea0bbef51623e7c806b1a43445ae3c76e1e0 \
+    --hash=sha256:4da9acbeec38eb7afa9fbeecad658950d990f36d16fe76c12c2d217ae0b8da32 \
+    --hash=sha256:5b79a606f6639d9bed74ef7072f36756a95a804c86d7adb367b39307ac771600 \
+    --hash=sha256:5ddaf38291f60ec20e8c7889b28e339bf17ad1b4df768b8bb5e6c9f9e445efbb \
+    --hash=sha256:7ac57c4e16c62f265b5ecc2b45d6bbafe9dc70a99b849ed6cfb8d16f32204589 \
+    --hash=sha256:83885db963eb0b95a0757b4907a37115a1d2aebfa9cf43b99ebac8db35713d37 \
+    --hash=sha256:9aafadbe29db3d4285026044aafeb28f2a3de4bd0df70718ec6892b7d27a4ded \
+    --hash=sha256:9e8bc8a7693c5c212cd1450d728f47e1f05aa07ae003de30415893d0daf7d243 \
+    --hash=sha256:a22e2f17c97940cd566f351f186d8fe04285280d052ca1512ff223febbe9979c \
+    --hash=sha256:b99a8bf9d5391954c0c08675a8cb39219923fe2ee249faa3546ebbf75783a360 \
+    --hash=sha256:c517fc55502a7e3d1a8b9310abad95cec61dded5a38d328fe0220bcf7b036268 \
+    --hash=sha256:c61c59ba665948c0a855926997ee96026420b628816b2e406998ec797caddb22 \
+    --hash=sha256:e0ad42a1ef35549282e2087a7c1e6ec8b7aa624a95e8fc0a60da777ca87e71de \
+    --hash=sha256:e8bb453551deced08ec5c4576da61ebf1e2b4a45aeff48e09f47ec332f7cad3d \
+    --hash=sha256:f94843e54500a9c8c169135f79572bfaba946efe4f7178e834c227280c1b0c12 \
+    --hash=sha256:f9a2a55abf889f6df68b5f62cd5f3ec4a2f305ac57ed09becd52e16201edcd86 \
+    --hash=sha256:ff0bdebd1b43c0c6db53095784c787c4e4eae671356cf521c4b7482ed78a1a7e
+    # via
+    #   -r polars2.in
+    #   rapidsmpf-cu13
+libcudf-cu13==26.6.0 \
+    --hash=sha256:afb3186ba4fa77183774d2f30f6086e63fbd54cef338a4cd5c8d4db809e7d761 \
+    --hash=sha256:e72e872be2b7a409e8cc953bd9abda750a03c3d30c2db510ebd2b73faf25878f
+    # via
+    #   -r polars2.in
+    #   librapidsmpf-cu13
+    #   pylibcudf-cu13
+libkvikio-cu13==26.6.0 \
+    --hash=sha256:4f558df2c742ea2b4a2728cabd81096afd6ac2591199160f1a34394507f05a01 \
+    --hash=sha256:56496826c3ab06360d7bf97255a3ceb78bc7dedcc85becac21dd6b2058f09f76
+    # via
+    #   -r polars2.in
+    #   libcudf-cu13
+librapidsmpf-cu13==26.6.0 \
+    --hash=sha256:44080c2869b1915aa8a9ddb34a67bf5cb20f9e2b2ce6f8691fc9f5a580a75877 \
+    --hash=sha256:a7f2fd608e103d09090bfe0211f110805b7d48fd7fa94a1be80074a18229a08e
+    # via
+    #   -r polars2.in
+    #   rapidsmpf-cu13
+librmm-cu13==26.6.0 \
+    --hash=sha256:38eb8ee9757cc27c2980fb0c92b8443a843841a35613ddeaa7141d1f782c89ed \
+    --hash=sha256:58dd98261f74ed0df523a93c063d182b8f1a8ee6b8afb46566e08f8829f28e13
+    # via
+    #   -r polars2.in
+    #   libcudf-cu13
+    #   librapidsmpf-cu13
+    #   libucxx-cu13
+    #   rmm-cu13
+libucx-cu13==1.20.1 \
+    --hash=sha256:7eb91daf873fb9a3f5d34cc7f39e6f0720c07d2c5eb158dee823960a1731c117 \
+    --hash=sha256:ceb464e46e8d9d7047b36fa45995d0265d23be234c7345b5cf332d8412257f64
+    # via
+    #   -r polars2.in
+    #   libucxx-cu13
+libucxx-cu13==0.50.0 \
+    --hash=sha256:2459022ef48cc28a0c5699c7c84b7f2c920d39ace6a18f268097efaed1611331 \
+    --hash=sha256:548b9e9c60b3d69c47e7913034927bfaa98bff6ab6db291c5f8d086f72b3dd52
+    # via
+    #   -r polars2.in
+    #   librapidsmpf-cu13
+    #   ucxx-cu13
+numpy==2.5.3 \
+    --hash=sha256:012e66aca395d795496446e52aeeb5866312a5d4d3f27da270e5a0b43f70dc5c \
+    --hash=sha256:09d5a423c71ad5feb5625844ad58050e35df43871004b52ac9c0ad44a56775be \
+    --hash=sha256:09ffa5d903faeaa5c4dd05009cf81c8bab9f2cb37c548b8d39b65b4cfa7c97f7 \
+    --hash=sha256:0a59a421a32580a009e8a1751345bf829631b990dc1794b80514ab722b435def \
+    --hash=sha256:116f96cadd935c6122e9228d676fe7ede19e741f5c8bb1c3cddbe0c51ccebea2 \
+    --hash=sha256:1302b90c0e52281681b2975adfe8a860cb7b12216a27b4b0b4207c44bf7bccf0 \
+    --hash=sha256:15aa985ac73a8db02db7663381aa109510449d3819d37206caed27b33a65a8a6 \
+    --hash=sha256:1aad64d99730d013cfc6debafed22783b4fc5a7f4b8bc744d2d8cf7dcc880551 \
+    --hash=sha256:1c80eabb4035ecf4ca9cd49cde8a9fdd69a729e63e6474887d1523ade7aa277f \
+    --hash=sha256:1f3ed25271581281f2fccb1adcedfcde4c07362eec69189b50baf6f90e3ae159 \
+    --hash=sha256:1fb6f8fb9ff0b3a69f52c66ce397b0246583e9f28616231b0e32ca49259a5fa6 \
+    --hash=sha256:214045a5bf00113a146ab9ee9730c44501af6723cdf1f6830932f7b5ef2e7af0 \
+    --hash=sha256:26e15e4aecd8617dfbaecb37d223e365d7b39411fba20454be2670a96aa74cb5 \
+    --hash=sha256:2c25dfa72943e4336ddb6b0ee4277b47a0c85bede0807530ec68103bf58e2c10 \
+    --hash=sha256:2d8240cb4c16fd831074aa2b2cf9fc54664d826341d61c372245b96a74a49a9a \
+    --hash=sha256:350ba9783ce969cf9f7ce6e6a9a58e1a6e2a19ca025b7ee448c4db727706212a \
+    --hash=sha256:4c8a6d2ebce6305fd82fbefca827775437147052a976ee7c94b36a0c1b52ac6c \
+    --hash=sha256:4f8929ee6c96bfbd7b4ed2032e0c03af86fe1826740ab61ddabf9072d06e57ff \
+    --hash=sha256:536f963710a4e63934d80ac0dc4f478804a83e9a84b6828018f25d09953ada33 \
+    --hash=sha256:54a115e5a73b8fc44f0cebef486365a1894b5c9760685d4558b72b7c3eb846e0 \
+    --hash=sha256:595d020938c84e320bcf40ad71089e108eac0d377cd018e14a8c094f39e98d85 \
+    --hash=sha256:66a78fe4556c60aceda5916f9eacd638b18e9e681016ec302dcb4682d6d4d034 \
+    --hash=sha256:6b05c171afb3aa07adbd20abc00aea86fe375beb0fdb9ef780ec5b7f63bab1c0 \
+    --hash=sha256:6cef4bb1706dfec49243c05d921eefb4e190d41e2528b30d8035ea1f36b4c24a \
+    --hash=sha256:6f24021b9f22bc6301c37b196974a92c1c18dccedb6fef3dd252e95f2d6adbe4 \
+    --hash=sha256:71b39d9f935b6ec0f8753e3e2afb51e3efba6f2e05b68b32a40754d24bcd4a3c \
+    --hash=sha256:71cad2b2a7451ab79d8f5e71b453485b6775963d5cf794179144a7463fe6e8ec \
+    --hash=sha256:76c2c1e6bfa5c84adc6434dfbf013aa92096a7985221762c8f11fedfd20fff58 \
+    --hash=sha256:8617bbfae4486cf99c9f899966699428d19da931d06ca94ad3da986c76e15997 \
+    --hash=sha256:86bff898a431c0fb71f7610b75726e75a54d47b37edc9d537f48de63bb3c0b90 \
+    --hash=sha256:8e4dd766076855b5ff7ea52fa5f07ce26286726e0f8bff446b7739d02e6ea204 \
+    --hash=sha256:92f30e89b8ee0ecf363033576c422b2f58fed6a80bed0aa48dff6d14c654663e \
+    --hash=sha256:93e1f5447e2b1e479d7bd74701e84746b86450cff1fc368b132d195e2b8f8211 \
+    --hash=sha256:9a37475425b431b4d060f23b4f52cd2f3aef6bc7c654bd760adf0040eec9d435 \
+    --hash=sha256:9deb49575e5b0b94ed72c8a64ec4d033381adc27e9060ae842971f697ba96104 \
+    --hash=sha256:a5fa86b80fd24bcd1aff83ad23be44ea323de3f787be8f8b15d4a65621e25321 \
+    --hash=sha256:a6391fafaba97500887132cd582abc6e19452b1ac775a47caa7b24490e152058 \
+    --hash=sha256:a72f874bc9e10e4b8f80426fb49716d5141f64442a0c8418065093ec8017fbb0 \
+    --hash=sha256:ac7bb1c52d445bd4f8f7f97fefe6abc3a084dc4d63df50d79b17fa2b78e89297 \
+    --hash=sha256:adc1ada2662f8a5f960b8a10d9986897e7499ef07e06d4cfe7197f8cce923c07 \
+    --hash=sha256:b00eefbcf0f292945c4b4dec2ae845389ef5bcdcd596e6e4328051db5b5ba694 \
+    --hash=sha256:b0521d0f4aebb6e06189451025fa17a913287b13c03d5fe05c017333b654ea5b \
+    --hash=sha256:b5d93cf48f687479941d12b69c873ad2cc76bbd487f0091c2200636497f34034 \
+    --hash=sha256:b7e18c623bb5c95acb3b3328861272816ba199fb531921c5d6d0b675f1fde9e3 \
+    --hash=sha256:bd4cb9ad3c7889b9b3fe0a9a9fb5d2ed26f9879bff2608d9f01aed147a20d231 \
+    --hash=sha256:be5a8381859b6da607c84f4f7d6847725f1cf1853ef8a2c9e115b7d58bef47dc \
+    --hash=sha256:befa1ae5bd6030b3f512b43ff3fa5290bbed6b84411a44244b14adf835f5b89d \
+    --hash=sha256:bf63afbe037eb5d2fe87fbcc7778e61da53ebaf21d938a4515aa73b62532a5d4 \
+    --hash=sha256:c00abe94c1a69d75d827dcf1c025b25c8a45d230b3bcd77a9020883a1b047653 \
+    --hash=sha256:c2381f82999704f818e2c987a865050e285ec3621262c66d40f5a96c8f899f8e \
+    --hash=sha256:c76d5dde9f445058f83d0c02af00557a4db91de9a9a57c0df87d1535001d654b \
+    --hash=sha256:cb189f09db39283b26bfd061ec16189e14f71c6755207f72a0f7540867afe5b9 \
+    --hash=sha256:ccb32e0525d29e8b0572eb84c9a57af0e7a4e615726927506f55063c62414034 \
+    --hash=sha256:ccbc4665079665c3cf3bab4db9f6b095370cd6437d66be549b6c2a1fd19e1958 \
+    --hash=sha256:d1c89973648c85069c5046ad460f7b8a00218b29a2e42359ac8cc63e9ab94832 \
+    --hash=sha256:df2d5874ff183595a4ba404edd04f6bd9b5505c1d7708573f6a6c17489a67563 \
+    --hash=sha256:e01c918ac3d48e18a927cf7b14a26a3e29ff2bdf2eacb976da0aecd6a43ed034 \
+    --hash=sha256:e6ab667ba76450084eb64013762c438ea76d9d29cc676dcd6c2e9892ba37f841 \
+    --hash=sha256:e931e4f499e0dc7ef29d269a8e5b35dd722e5d14be07df6240166ea7c6532fae \
+    --hash=sha256:f54660b0eb6b0b9f36e7fe1cdfdff472028dd0d14acd9b9b65098efbad059469 \
+    --hash=sha256:f59a878c33d6b88122d80d239bb3b845d58708750b0cb06a09aebb9b18ec696c \
+    --hash=sha256:f7fabeb6cea87d65f3b926de33d03fb016cfdc29314c90974383b5582ae72891 \
+    --hash=sha256:f9579f383d1bf9df80081e72760e84960a7fd4f88cf0c9e535a8597c9bb646f5 \
+    --hash=sha256:f9a2353b37a1a9e78fd82b27ad7e2a32a2d036604d18f02b05e3136c62ca3b09 \
+    --hash=sha256:fc36dc566135b5eceec4cf89758fcb719266a019ef07dae1754ae7c9f617ef3e \
+    --hash=sha256:ffdc76bfcae6b255dff75202c5e7feaf95b40246bc0a17944facc1fecf9f79ab
+    # via
+    #   -r polars2.in
+    #   cuda-core
+    #   cupy-cuda13x
+    #   rapidsmpf-cu13
+    #   rmm-cu13
+    #   ucxx-cu13
+nvidia-libnvcomp-cu13==5.2.0.13 \
+    --hash=sha256:393ca270b22d61be589206658df139676e2f7e21387a8e84e45977cb4ef3303c \
+    --hash=sha256:452f381b6c7302074a0e945faf88be11639802905e637a646a69806af298744c \
+    --hash=sha256:6eb639633c9281e3c3b6a526d09e89c7190e633a2b005a22926cf61a4fee9159
+    # via
+    #   -r polars2.in
+    #   libcudf-cu13
+nvidia-ml-py==13.610.43 \
+    --hash=sha256:65437eb73d68d0c62c931ca4d45038472faff03bd0b8729abba4b899f70d60f2 \
+    --hash=sha256:f13c72698edef492f985cc225f14faafe68ae065a2e407f45bdf6f4b9b43fde8
+    # via
+    #   -r polars2.in
+    #   cudf-polars-cu13
+    #   ucxx-cu13
+nvidia-nvjitlink-cu12==12.9.86 \
+    --hash=sha256:994a05ef08ef4b0b299829cde613a424382aff7efb08a7172c1fa616cc3af2ca \
+    --hash=sha256:cc6fcec260ca843c10e34c936921a1c426b351753587fdd638e8cff7b16bb9db \
+    --hash=sha256:e3f1171dbdc83c5932a45f0f4c99180a70de9bd2718c1ab77d14104f6d7147f9
+    # via -r polars2.in
+nvtx==0.2.16 \
+    --hash=sha256:13bb22db325321a0b383d156d84d22851127b3ffb686b54c2fabe0a7d182d53b \
+    --hash=sha256:154df7d6d5f47d2831275c6e2ad6fc9e917abe90bbc2513c501943fc4ec1dbff \
+    --hash=sha256:18bcb56547640c58ebc38c6674526df43d7f34afd288bdff92bf399fd54e2b04 \
+    --hash=sha256:23f30fcaf68f53d1895282315cb35aed5f605d59aeb33e75e276545ff95c4af6 \
+    --hash=sha256:252fdb870308be4a2beecb3ed174b1d59099eeb63c883f269944a765ce5f7720 \
+    --hash=sha256:28ae389d16dd1110fe9563c14b38571e43dae9b9380e9253ce03fe1e8ed37791 \
+    --hash=sha256:31772179fa2b3f4502a5b0fb44958beba22f1a365c559ddb6333790d2ff993ef \
+    --hash=sha256:4592470f9dd67a23ee8523850a6b98fed4f220337a21605809c4b9a20daec726 \
+    --hash=sha256:48cb7700eea0d8fd588c95bb3023c5eb46ec0ca7936d4acba843bfce91807880 \
+    --hash=sha256:4a94c321fc3fe489e40f82e2d7fe7db7ef312882e85228aaaa97ee3dfadc067c \
+    --hash=sha256:624bf44efe550528e210ccb9fae2f53512f1f22a2f2629eca08b1c1e020e13ea \
+    --hash=sha256:916cc45efa8794d3ad4c1f91e32110eb419f2d7669af6a10f47143e9e0844855 \
+    --hash=sha256:92a6ba76504967d5686f3c02bb980af22567ad2d58f50c934fc49f0799f5193e \
+    --hash=sha256:95a0da1f7ba534dcf144f95f8c98ad6e4a639ca239a665b96fd6262790a90f1a \
+    --hash=sha256:9bfa46d2f98888813fc5dc17294cd657a073e407bfd29ce147ddfdbcf05fc4c5 \
+    --hash=sha256:a5dbb81e4098382bd2209a15dc8a8a53ff3db309e1ad160ff2fd5c18a94c3cfd \
+    --hash=sha256:ae4f45566ea3754f8599241a4537c8bf5fb5a1f0044878c9edca4185a0ef1fcf \
+    --hash=sha256:b6230be4ee35edcfe00411c6f71d48de5d50147146c4efc06b710d2516086031 \
+    --hash=sha256:c0aebfba86aaff2775518549fb4e4b8f96d3626091b31e1679e77af73fcbbb00 \
+    --hash=sha256:c5dbff0f10565da97b826a357b0835a0fd8008cb646e968ed5224168082ed917 \
+    --hash=sha256:cda9dc7019247b6ecf5fdce72e5fb6d2b70b82d2bf6e15441f344287e4174780 \
+    --hash=sha256:d4e814ecc617847d8baf32c87dde4d67f5097c4b5128866da2212326d9d2b541 \
+    --hash=sha256:d96771d2f4e8028005fa65f577eabd8799271870e97ffbeb1372acd391832873 \
+    --hash=sha256:dd82d57c53acf366feb7c0a3d54e10c99e8ddb2171de9fef49cda4b7ded7d9fc \
+    --hash=sha256:e74ddf31c16c76ab000fbbe7e5a58cd88ade578a4de13bb012446580e961a4cb \
+    --hash=sha256:e7c0be5e0784576adb495ac6c99a3a5ed6cf79158903d3d3b94a0f724d15e3bd \
+    --hash=sha256:f1ce0c2509a6136ceaaebf73bb4b4d20fb741a2852c5c63ae4b6c1e5a5bb8fac \
+    --hash=sha256:f6d2922f5637b5f4c646599a066a770e7f26e154697dc217ad0aa8b831ea1338 \
+    --hash=sha256:f70870ead7b6cf4227e4ae6ceba4e89a4bc3eecffbb62baca2c39a58d808df7e
+    # via
+    #   -r polars2.in
+    #   pylibcudf-cu13
+packaging==26.3 \
+    --hash=sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79 \
+    --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
+    # via
+    #   -r polars2.in
+    #   cudf-polars-cu13
+polars==1.39.3 \
+    --hash=sha256:2e016c7f3e8d14fa777ef86fe0477cec6c67023a20ba4c94d6e8431eefe4a63c \
+    --hash=sha256:c2b955ccc0a08a2bc9259785decf3d5c007b489b523bf2390cf21cec2bb82a56
+    # via
+    #   -r polars2.in
+    #   cudf-polars-cu13
+polars-runtime-32==1.39.3 \
+    --hash=sha256:06b47f535eb1f97a9a1e5b0053ef50db3a4276e241178e37bbb1a38b1fa53b14 \
+    --hash=sha256:363d49e3a3e638fc943e2b9887940300a7d06789930855a178a4727949259dc2 \
+    --hash=sha256:425c0b220b573fa097b4042edff73114cc6d23432a21dfd2dc41adf329d7d2e9 \
+    --hash=sha256:7c206bdcc7bc62ea038d6adea8e44b02f0e675e0191a54c810703b4895208ea4 \
+    --hash=sha256:8bc9e13dc1d2e828331f2fe8ccbc9757554dc4933a8d3e85e906b988178f95ed \
+    --hash=sha256:c728e4f469cafab501947585f36311b8fb222d3e934c6209e83791e0df20b29d \
+    --hash=sha256:d66ca522517554a883446957539c40dc7b75eb0c2220357fb28bc8940d305339 \
+    --hash=sha256:ef5884711e3c617d7dc93519a7d038e242f5741cfe5fe9afd32d58845d86c562 \
+    --hash=sha256:f49f51461de63f13e5dd4eb080421c8f23f856945f3f8bd5b2b1f59da52c2860
+    # via
+    #   -r polars2.in
+    #   polars
+pyarrow==25.0.1 \
+    --hash=sha256:0b1edbb2f385a6a65e9711b62ba86ac54a7816a3f8d17bb3e8a5929d65fb2485 \
+    --hash=sha256:0b726ad7e7b669be982b0c71c07fe4b037d654354130da79a7902a669e93a66b \
+    --hash=sha256:0befcf816e45a1af33ac775a9970b749e4868a230c7372f0ae5e932bee27039f \
+    --hash=sha256:0fe7c8b6c03969b49c8c66182e4a18e3819ab92d07cfab5d8370c531b9369ef0 \
+    --hash=sha256:119297a6dc197e45d9c6d4415f7814a67ffa36c180d26f68c154c58067ae782d \
+    --hash=sha256:169d3429d5be7c752125890620f75a60776d38b0035eddae939651640822332e \
+    --hash=sha256:25f8720bf6387d5dc2ebd2622112de630760419e4b66134405dd24110d15f37e \
+    --hash=sha256:31e49a7888fcdf3a835da33ae777f6bb9a866334e5a789282fc26dcf426f7f15 \
+    --hash=sha256:35935cd5de130aa5cf4dea052a63e6bf2e17006c35c3a468194242b9b2bf5956 \
+    --hash=sha256:38a9a4b4b9613380e200641891495a56c3d5a98a092db4a870af9975e220471d \
+    --hash=sha256:3f89685964f46e4216103c75483aac0c0692a5f72212d7ca835adba5ede56ce3 \
+    --hash=sha256:4288f27577352d608ca08553b0865e4a9b3aa14820c5d95b53337218d609835b \
+    --hash=sha256:4340f0ba6c1d2e13f21658de1d7c662ca2545018568d0030a1e9afca159d87e3 \
+    --hash=sha256:44a9120ce5bd81936b8ab9a88076e3fd47c2c6838e0e43630fed83626aca81d9 \
+    --hash=sha256:4facd65742a024a4a366328a1d2292062d72d6e023c1b7dda8d4c37544933a25 \
+    --hash=sha256:51093dd9e10325fbdb3c10a2ae7c4806e5c822d94e74ae4938b26524a3323fee \
+    --hash=sha256:514ddb60285631af068875550c90eddc181db3e8e63a032b1559be189e82f056 \
+    --hash=sha256:5389cdf79447ed1515c9e31620e6e1e2302249564d603f2ad727d4f6d313e4c3 \
+    --hash=sha256:59a2de54c0cbd954da861eee4d1d330f8e909c45b53455baef696380f2c55033 \
+    --hash=sha256:60e89d8f13861a1f7f8d950fa54aebb8023b30734d0ac51ffa80beabe2df4bba \
+    --hash=sha256:6109c94d8b9f3b17a041daca16cacb2f651ad8f1ef70a4232c2c0f37a23da2a8 \
+    --hash=sha256:62cd0d785b8aa6675ee355f9fc02252a340f4441257c42674937826fd7594325 \
+    --hash=sha256:6943e2fe7954d29d84de45d29d34c8dc36ce96570e67d89aa9976e650a4a9138 \
+    --hash=sha256:6a1fdfc6659b6b19022f2e50627fb5cf7156a66c46bf4299379955cbe742382a \
+    --hash=sha256:880523be3d29efcf83d3998835d206118ccf35e3871dbd2fb60408cf6b007a80 \
+    --hash=sha256:8858d7bfc22e3f51529aeaa4077225029724623e4595dc9eff8c793935c34140 \
+    --hash=sha256:9150a83248bfed9813ea3c3af74c3856c1984d444aa28e58bf7733b9750ddf6a \
+    --hash=sha256:9171748cdf796972d85a4b60157c279913e242992e350c90c7450182a9838b2a \
+    --hash=sha256:a4d6d5e9a3d1879a97c08ded0c797579b7965eafd0f0c26c30b45ccc06db939b \
+    --hash=sha256:a4dd8bf99a8fac133efc0ed6a92f5fddbe2adba0d0f6dd720e39ba9855cea85c \
+    --hash=sha256:aa0559502e1cd6254d6814614085dd9c5a3dd0419362978a936a3f68a9e5c3df \
+    --hash=sha256:b7a296aac7a71fa0886c08e155ddb6c636a50013f801f6178daafa0f9e726188 \
+    --hash=sha256:bddd0c4f7630c2a3ddf6347c1bdaa79d97bcf6bd445f9e60c816b7d77c85a5ae \
+    --hash=sha256:bf0b672390cdcb640d7288f96b826d71ff4e9abb254a86c89890baf51a29cee6 \
+    --hash=sha256:c7c534ec03c358a76ea3e505e74c1b6aef290af90c444dfd092dbfe23e755b85 \
+    --hash=sha256:cab40b1edfef0262e0e5251aa2c58d75630f24d06dd7794480243acc001a1d7d \
+    --hash=sha256:cc4aa407fde9fc660be3939e49ea31f50f3e9fec17c0ec63159f7711edd3efc9 \
+    --hash=sha256:d51592cb7561e87877c506113e7adbf1342ab579e6c21f0ef44b8ba41cb74c80 \
+    --hash=sha256:dda9470024204d7bbf2042b47c6e8a0e47a3eeb8e34405882dfaea6577e0c153 \
+    --hash=sha256:df961f2e7ae9cf496459259d798652c70625f6c080650d6952f8c04053c58ee9 \
+    --hash=sha256:eb6203482ff3746a5632303a7279ae0b5a304c46985b49ed1378cb350ea6728d \
+    --hash=sha256:f3831aaa25c67a99f99dc8b05873cb9d64560390372e2aa197ce9dd4a3f06a44 \
+    --hash=sha256:f729cfdbd36fd99d543b67a914d2de044c84ebe45be8b34902b299b608c15c8f
+    # via -r polars2.in
+pylibcudf-cu13==26.6.0 \
+    --hash=sha256:9ffe1afeba14596328729645721cf9b79c0ecf4671578536f0b675eec000fe88 \
+    --hash=sha256:d22210c9057aa51381d921ef62ad6ef53b9f64abb9a31840694ccd4f5301ee1d
+    # via
+    #   -r polars2.in
+    #   cudf-polars-cu13
+    #   rapidsmpf-cu13
+rapids-logger==0.2.3 \
+    --hash=sha256:119a0391a6965b773dc0e48c35e3872585e69418aedbc8b618ac2bf63ae12e28 \
+    --hash=sha256:7fe67ef4049c5d8ba6154746325dcf7cc0f327f0efa8f2611fc8f64e67510f60
+    # via
+    #   -r polars2.in
+    #   libcudf-cu13
+    #   libkvikio-cu13
+    #   librmm-cu13
+rapidsmpf-cu13==26.6.0 \
+    --hash=sha256:1b79fa4de5b0b6d0866085930e6480a566276417824f648e7b687d9a8d85b373 \
+    --hash=sha256:ae9d54c6a7c79c3be37b935eae34db4b36278a6a38300dc5c15afab147a30f36
+    # via
+    #   -r polars2.in
+    #   cudf-polars-cu13
+rmm-cu13==26.6.0 \
+    --hash=sha256:6e9990be37a501fa8e5278c6241d9ff36b4ad3ac157b7f99af61ac7048cc5bea \
+    --hash=sha256:ead63feae409efaa9f092b586b6dc723ec35ef4d73b93f0230777ae386940366
+    # via
+    #   -r polars2.in
+    #   pylibcudf-cu13
+    #   rapidsmpf-cu13
+    #   ucxx-cu13
+typing-extensions==4.16.0 \
+    --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8 \
+    --hash=sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5
+    # via
+    #   -r polars2.in
+    #   cudf-polars-cu13
+ucxx-cu13==0.50.0 \
+    --hash=sha256:c5dbb0b0724fb92eba84bca3e64d1c467d20b3f8e25c20ece11aea0a2aab214c \
+    --hash=sha256:fd0069ef436eb87615498fe2eb3436c5f495bea52d8b39120abc7d8744851e89
+    # via
+    #   -r polars2.in
+    #   rapidsmpf-cu13

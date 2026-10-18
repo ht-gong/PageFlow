@@ -1,0 +1,1 @@
+from .tqpmemory import * 

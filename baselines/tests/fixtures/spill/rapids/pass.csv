@@ -1,0 +1,2 @@
+query,status,seconds,gpu_ops,result_rows_or_error
+query9,OK,2.604,43,175

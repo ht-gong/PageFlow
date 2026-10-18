@@ -1,0 +1,369 @@
+{
+    "filter 2 filter pipe": {
+        "totals": {
+            "peak_gpu_bytes": 57671680
+        }
+    },
+    "join 7 0 sort pipeline": {
+        "totals": {
+            "peak_gpu_bytes": 225443840
+        }
+    },
+    "join 7 1 sort pipeline": {
+        "totals": {
+            "peak_gpu_bytes": 456130560
+        }
+    },
+    "join 7 core pipeline": {
+        "totals": {
+            "peak_gpu_bytes": 304087040
+        }
+    },
+    "join 7 rearrange right": {
+        "totals": {
+            "peak_gpu_bytes": 152043520
+        }
+    },
+    "join 12 0 sort pipeline": {
+        "totals": {
+            "peak_gpu_bytes": 319815680
+        }
+    },
+    "join 12 1 sort pipeline": {
+        "totals": {
+            "peak_gpu_bytes": 330301440
+        }
+    },
+    "join 12 core pipeline": {
+        "totals": {
+            "peak_gpu_bytes": 193986560
+        }
+    },
+    "join 12 rearrange left": {
+        "totals": {
+            "peak_gpu_bytes": 173015040
+        }
+    },
+    "join 12 rearrange right": {
+        "totals": {
+            "peak_gpu_bytes": 173015040
+        }
+    },
+    "join 12 lineage right g0": {
+        "totals": {
+            "peak_gpu_bytes": 173015040
+        }
+    },
+    "join 17 0 sort pipeline": {
+        "totals": {
+            "peak_gpu_bytes": 387973120
+        }
+    },
+    "join 17 1 sort pipeline": {
+        "totals": {
+            "peak_gpu_bytes": 367001600
+        }
+    },
+    "join 17 core pipeline": {
+        "totals": {
+            "peak_gpu_bytes": 267386880
+        }
+    },
+    "join 17 rearrange right": {
+        "totals": {
+            "peak_gpu_bytes": 209715200
+        }
+    },
+    "join 17 lineage right g0": {
+        "totals": {
+            "peak_gpu_bytes": 209715200
+        }
+    },
+    "join 22 0 sort pipeline": {
+        "totals": {
+            "peak_gpu_bytes": 503316480
+        }
+    },
+    "join 22 1 sort pipeline": {
+        "totals": {
+            "peak_gpu_bytes": 492830720
+        }
+    },
+    "join 22 core pipeline": {
+        "totals": {
+            "peak_gpu_bytes": 293601280
+        }
+    },
+    "join 22 rearrange right": {
+        "totals": {
+            "peak_gpu_bytes": 246415360
+        }
+    },
+    "join 22 lineage right g0": {
+        "totals": {
+            "peak_gpu_bytes": 246415360
+        }
+    },
+    "join 22 lineage right g1": {
+        "totals": {
+            "peak_gpu_bytes": 246415360
+        }
+    },
+    "join 27 0 sort pipeline": {
+        "totals": {
+            "peak_gpu_bytes": 408944640
+        }
+    },
+    "join 27 1 sort pipeline": {
+        "totals": {
+            "peak_gpu_bytes": 419430400
+        }
+    },
+    "join 27 core pipeline": {
+        "totals": {
+            "peak_gpu_bytes": 288358400
+        }
+    },
+    "join 27 lineage right g0": {
+        "totals": {
+            "peak_gpu_bytes": 267386880
+        }
+    },
+    "join 27 lineage right g1": {
+        "totals": {
+            "peak_gpu_bytes": 267386880
+        }
+    },
+    "join 27 lineage right g2": {
+        "totals": {
+            "peak_gpu_bytes": 267386880
+        }
+    },
+    "deferred gather 28 g0": {
+        "totals": {
+            "peak_gpu_bytes": 267386880
+        }
+    },
+    "deferred gather 28 g1": {
+        "totals": {
+            "peak_gpu_bytes": 267386880
+        }
+    },
+    "deferred gather 28 g2": {
+        "totals": {
+            "peak_gpu_bytes": 267386880
+        }
+    },
+    "deferred gather 28 g3": {
+        "totals": {
+            "peak_gpu_bytes": 267386880
+        }
+    },
+    "project 28 project pipeline": {
+        "totals": {
+            "peak_gpu_bytes": 293601280
+        }
+    },
+    "aggregation 31 two-pass aggregation pass1": {
+        "totals": {
+            "peak_gpu_bytes": 361758720
+        }
+    },
+    "aggregation 31 two-pass aggregation pass2": {
+        "totals": {
+            "peak_gpu_bytes": 367001600
+        }
+    },
+    "wall": {
+        "occurrence": 0,
+        "approx_time": 0.10619759559631348
+    },
+    "movement": {
+        "kinds": {
+            "scan_h2d": {
+                "pages": 7,
+                "logical_b": 83889920,
+                "wire_b": 25140586
+            },
+            "scan_uva": {
+                "pages": 0,
+                "logical_b": 27234652,
+                "wire_b": 27234652
+            },
+            "spill_bypass": {
+                "pages": 68,
+                "logical_b": 264014370,
+                "wire_b": 104622588
+            },
+            "spill_rejected": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "spill_evict": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "spill_mirror": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "restore_h2d": {
+                "pages": 60,
+                "logical_b": 241217282,
+                "wire_b": 74956388
+            },
+            "restore_evicted_h2d": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "restore_uva": {
+                "pages": 0,
+                "logical_b": 33218016,
+                "wire_b": 33218016
+            },
+            "cache_hit": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "resident_d2d": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "cache_fill": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "avoided_dead": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "avoided_clean": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "result_d2h": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            }
+        },
+        "output": {
+            "scan_h2d": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "scan_uva": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "spill_bypass": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "spill_rejected": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "spill_evict": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "spill_mirror": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "restore_h2d": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "restore_evicted_h2d": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "restore_uva": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "cache_hit": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "resident_d2d": {
+                "pages": 3,
+                "logical_b": 7175,
+                "wire_b": 7175
+            },
+            "cache_fill": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "avoided_dead": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "avoided_clean": {
+                "pages": 0,
+                "logical_b": 0,
+                "wire_b": 0
+            },
+            "result_d2h": {
+                "pages": 3,
+                "logical_b": 7175,
+                "wire_b": 7175
+            }
+        }
+    },
+    "residency": {
+        "timed": true,
+        "gpu_arena": {
+            "capacity_b": 31138512896,
+            "at_start_b": 0,
+            "peak_b": 503316480
+        },
+        "host_pool": {
+            "capacity_b": 1073741824,
+            "block_b": 524288,
+            "at_start_b": {
+                "scan": 477102080
+            },
+            "peak_b": {
+                "scan": 477102080,
+                "intermediate": 29360128
+            },
+            "peak_total_b": 480772096
+        },
+        "slot_pool": null
+    },
+    "sizing_model": {
+        "samples": [],
+        "dropped": 0,
+        "skipped_mixed": 0,
+        "skipped_partial": 0,
+        "skipped_no_pending": 0,
+        "skipped_sectioned": 0
+    },
+    "compression": {
+        "pipes": []
+    }
+}

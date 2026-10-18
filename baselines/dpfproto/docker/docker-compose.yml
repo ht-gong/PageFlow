@@ -1,0 +1,28 @@
+services:
+  golap:
+    build:
+      context: .. # dpfproto root
+      dockerfile: docker/Dockerfile
+    image: dpfproto-golap:cuda13.2
+    ipc: host # host ramdisk
+    cap_add:
+      - SYS_ADMIN # cufile access
+    environment:
+      NVIDIA_DISABLE_REQUIRE: "1" # use cuda 13 2
+      CUDA_VISIBLE_DEVICES: "${GPU:-1}" # selected gpu
+      GOLAP_ALLOW_NVML_FAILURE: "1" # optional telemetry
+      SF: "${SF:-300}"
+      TRIALS: "${TRIALS:-3}"
+      THREADS: "${THREADS:-1}"
+      QUERIES: "${QUERIES:-q1 q3 q5 q6 q13 q16}"
+      DEVICE_SIZE: "${DEVICE_SIZE:-128G}"
+    volumes:
+      - ../data/tpch:/workspace/data/tpch:ro # input data
+      - ../logs:/workspace/logs # saved results
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${GPU:-1}"] # selected gpu
+              capabilities: [gpu]

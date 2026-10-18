@@ -1,0 +1,21 @@
+{
+  "quent": {
+    "version": "0.1.0",
+    "commit": "b21933d06dbb0c46339ded31d0fdaacae03cc3b1",
+    "branch": "master",
+    "remote": "https://github.com/rapidsai/quent",
+    "built_at": "2026-09-16T10:31:16+00:00"
+  },
+  "model": {
+    "name": "Sirius",
+    "package": "instrumentation-model",
+    "source": {
+      "version": "0.1.0",
+      "commit": "d79d4f978be9b1eae7a30a83eed269071eb3fff3",
+      "branch": "HEAD",
+      "remote": "https://github.com/sirius-db/sirius.git",
+      "built_at": "2026-09-22T23:18:11+00:00"
+    },
+    "analyzer_package": "sirius-telemetry-analyzer"
+  }
+}

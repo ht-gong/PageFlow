@@ -1,0 +1,15 @@
+# pyproject.toml
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "TQPBackend"
+version = "1.0.0"
+
+[tool.pytest.ini_options]
+# baselines/ holds the baselines harness, whose scripts are not TQP-Vortex tests.
+testpaths = ["tests"]
+markers = [
+    "e2e: full-engine SF1 runs of main.py per adaptive-flag cell and per --uvm cell (GPU, ~3 min)",
+]

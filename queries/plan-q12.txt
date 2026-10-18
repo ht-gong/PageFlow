@@ -1,0 +1,89 @@
+# Captured by parsing/regenerate.py with pyspark 4.2.0. Do not edit; regenerate with `make plans Q=12`.
+== Physical Plan ==
+AdaptiveSparkPlan (14)
++- Sort (13)
+   +- Exchange (12)
+      +- HashAggregate (11)
+         +- Exchange (10)
+            +- HashAggregate (9)
+               +- Project (8)
+                  +- BroadcastHashJoin Inner BuildLeft (7)
+                     :- BroadcastExchange (3)
+                     :  +- Filter (2)
+                     :     +- Scan parquet  (1)
+                     +- Project (6)
+                        +- Filter (5)
+                           +- Scan parquet  (4)
+
+
+(1) Scan parquet 
+Output [2]: [o_orderkey#67, o_orderpriority#72]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-orders]
+PushedFilters: [IsNotNull(o_orderkey)]
+ReadSchema: struct<o_orderkey:int,o_orderpriority:string>
+
+(2) Filter
+Input [2]: [o_orderkey#67, o_orderpriority#72]
+Condition : isnotnull(o_orderkey#67)
+
+(3) BroadcastExchange
+Input [2]: [o_orderkey#67, o_orderpriority#72]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, false] as bigint)),false), [plan_id=184]
+
+(4) Scan parquet 
+Output [5]: [l_orderkey#92, l_shipdate#102, l_commitdate#103, l_receiptdate#104, l_shipmode#106]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-lineitem]
+PushedFilters: [IsNotNull(l_commitdate), IsNotNull(l_receiptdate), IsNotNull(l_shipdate), In(l_shipmode, [MAIL,SHIP]), GreaterThanOrEqual(l_receiptdate,1994-01-01), LessThan(l_receiptdate,1995-01-01), IsNotNull(l_orderkey)]
+ReadSchema: struct<l_orderkey:int,l_shipdate:date,l_commitdate:date,l_receiptdate:date,l_shipmode:string>
+
+(5) Filter
+Input [5]: [l_orderkey#92, l_shipdate#102, l_commitdate#103, l_receiptdate#104, l_shipmode#106]
+Condition : ((((((((isnotnull(l_commitdate#103) AND isnotnull(l_receiptdate#104)) AND isnotnull(l_shipdate#102)) AND l_shipmode#106 IN (MAIL,SHIP)) AND (l_commitdate#103 < l_receiptdate#104)) AND (l_shipdate#102 < l_commitdate#103)) AND (l_receiptdate#104 >= 1994-01-01)) AND (l_receiptdate#104 < 1995-01-01)) AND isnotnull(l_orderkey#92))
+
+(6) Project
+Output [2]: [l_orderkey#92, l_shipmode#106]
+Input [5]: [l_orderkey#92, l_shipdate#102, l_commitdate#103, l_receiptdate#104, l_shipmode#106]
+
+(7) BroadcastHashJoin
+Left keys [1]: [o_orderkey#67]
+Right keys [1]: [l_orderkey#92]
+Join type: Inner
+Join condition: None
+
+(8) Project
+Output [2]: [o_orderpriority#72, l_shipmode#106]
+Input [4]: [o_orderkey#67, o_orderpriority#72, l_orderkey#92, l_shipmode#106]
+
+(9) HashAggregate
+Input [2]: [o_orderpriority#72, l_shipmode#106]
+Keys [1]: [l_shipmode#106]
+Functions [2]: [partial_sum(CASE WHEN ((o_orderpriority#72 = 1-URGENT) OR (o_orderpriority#72 = 2-HIGH)) THEN 1 ELSE 0 END), partial_sum(CASE WHEN (NOT (o_orderpriority#72 = 1-URGENT) AND NOT (o_orderpriority#72 = 2-HIGH)) THEN 1 ELSE 0 END)]
+Aggregate Attributes [2]: [sum#126L, sum#127L]
+Results [3]: [l_shipmode#106, sum#128L, sum#129L]
+
+(10) Exchange
+Input [3]: [l_shipmode#106, sum#128L, sum#129L]
+Arguments: hashpartitioning(l_shipmode#106, 200), ENSURE_REQUIREMENTS, [plan_id=189]
+
+(11) HashAggregate
+Input [3]: [l_shipmode#106, sum#128L, sum#129L]
+Keys [1]: [l_shipmode#106]
+Functions [2]: [sum(CASE WHEN ((o_orderpriority#72 = 1-URGENT) OR (o_orderpriority#72 = 2-HIGH)) THEN 1 ELSE 0 END), sum(CASE WHEN (NOT (o_orderpriority#72 = 1-URGENT) AND NOT (o_orderpriority#72 = 2-HIGH)) THEN 1 ELSE 0 END)]
+Aggregate Attributes [2]: [sum(CASE WHEN ((o_orderpriority#72 = 1-URGENT) OR (o_orderpriority#72 = 2-HIGH)) THEN 1 ELSE 0 END)#124L, sum(CASE WHEN (NOT (o_orderpriority#72 = 1-URGENT) AND NOT (o_orderpriority#72 = 2-HIGH)) THEN 1 ELSE 0 END)#125L]
+Results [3]: [l_shipmode#106, sum(CASE WHEN ((o_orderpriority#72 = 1-URGENT) OR (o_orderpriority#72 = 2-HIGH)) THEN 1 ELSE 0 END)#124L AS high_line_count#122L, sum(CASE WHEN (NOT (o_orderpriority#72 = 1-URGENT) AND NOT (o_orderpriority#72 = 2-HIGH)) THEN 1 ELSE 0 END)#125L AS low_line_count#123L]
+
+(12) Exchange
+Input [3]: [l_shipmode#106, high_line_count#122L, low_line_count#123L]
+Arguments: rangepartitioning(l_shipmode#106 ASC NULLS FIRST, 200), ENSURE_REQUIREMENTS, [plan_id=192]
+
+(13) Sort
+Input [3]: [l_shipmode#106, high_line_count#122L, low_line_count#123L]
+Arguments: [l_shipmode#106 ASC NULLS FIRST], true, 0
+
+(14) AdaptiveSparkPlan
+Output [3]: [l_shipmode#106, high_line_count#122L, low_line_count#123L]
+Arguments: isFinalPlan=false
+
+

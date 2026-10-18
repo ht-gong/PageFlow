@@ -1,0 +1,6 @@
+26/10/09 07:26:16 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+26/10/09 07:26:17 INFO SparkContext: Running Spark version 3.5.8
+26/10/09 07:26:17 INFO SparkContext: OS info Linux, 5.15.0-52-generic, amd64
+26/10/09 07:26:17 INFO SparkContext: Java version 17.0.20.1
+26/10/09 07:26:17 WARN SparkConf: Note that spark.local.dir will be overridden by the value set by the cluster manager (via SPARK_LOCAL_DIRS in mesos/standalone/kubernetes and LOCAL_DIRS in YARN).
+26/10/09 07:26:29 INFO GpuDeviceManager: Initializing RMM ASYNC pool size = 256.0 MB on gpuId 0

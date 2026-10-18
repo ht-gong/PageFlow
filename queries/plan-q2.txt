@@ -1,0 +1,309 @@
+# Captured by parsing/regenerate.py with pyspark 4.2.0. Do not edit; regenerate with `make plans Q=2`.
+== Physical Plan ==
+AdaptiveSparkPlan (51)
++- TakeOrderedAndProject (50)
+   +- Project (49)
+      +- BroadcastHashJoin Inner BuildRight (48)
+         :- Project (43)
+         :  +- BroadcastHashJoin Inner BuildRight (42)
+         :     :- Project (38)
+         :     :  +- BroadcastHashJoin Inner BuildRight (37)
+         :     :     :- Project (33)
+         :     :     :  +- BroadcastHashJoin Inner BuildLeft (32)
+         :     :     :     :- BroadcastExchange (9)
+         :     :     :     :  +- Project (8)
+         :     :     :     :     +- BroadcastHashJoin Inner BuildLeft (7)
+         :     :     :     :        :- BroadcastExchange (4)
+         :     :     :     :        :  +- Project (3)
+         :     :     :     :        :     +- Filter (2)
+         :     :     :     :        :        +- Scan parquet  (1)
+         :     :     :     :        +- Filter (6)
+         :     :     :     :           +- Scan parquet  (5)
+         :     :     :     +- Filter (31)
+         :     :     :        +- HashAggregate (30)
+         :     :     :           +- Exchange (29)
+         :     :     :              +- HashAggregate (28)
+         :     :     :                 +- Project (27)
+         :     :     :                    +- BroadcastHashJoin Inner BuildRight (26)
+         :     :     :                       :- Project (21)
+         :     :     :                       :  +- BroadcastHashJoin Inner BuildRight (20)
+         :     :     :                       :     :- Project (16)
+         :     :     :                       :     :  +- BroadcastHashJoin Inner BuildRight (15)
+         :     :     :                       :     :     :- Filter (11)
+         :     :     :                       :     :     :  +- Scan parquet  (10)
+         :     :     :                       :     :     +- BroadcastExchange (14)
+         :     :     :                       :     :        +- Filter (13)
+         :     :     :                       :     :           +- Scan parquet  (12)
+         :     :     :                       :     +- BroadcastExchange (19)
+         :     :     :                       :        +- Filter (18)
+         :     :     :                       :           +- Scan parquet  (17)
+         :     :     :                       +- BroadcastExchange (25)
+         :     :     :                          +- Project (24)
+         :     :     :                             +- Filter (23)
+         :     :     :                                +- Scan parquet  (22)
+         :     :     +- BroadcastExchange (36)
+         :     :        +- Filter (35)
+         :     :           +- Scan parquet  (34)
+         :     +- BroadcastExchange (41)
+         :        +- Filter (40)
+         :           +- Scan parquet  (39)
+         +- BroadcastExchange (47)
+            +- Project (46)
+               +- Filter (45)
+                  +- Scan parquet  (44)
+
+
+(1) Scan parquet 
+Output [4]: [p_partkey#9, p_mfgr#11, p_type#13, p_size#14]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-part]
+PushedFilters: [IsNotNull(p_size), IsNotNull(p_type), EqualTo(p_size,15), StringEndsWith(p_type,BRASS), IsNotNull(p_partkey)]
+ReadSchema: struct<p_partkey:int,p_mfgr:string,p_type:string,p_size:int>
+
+(2) Filter
+Input [4]: [p_partkey#9, p_mfgr#11, p_type#13, p_size#14]
+Condition : ((((isnotnull(p_size#14) AND isnotnull(p_type#13)) AND (p_size#14 = 15)) AND EndsWith(p_type#13, BRASS)) AND isnotnull(p_partkey#9))
+
+(3) Project
+Output [2]: [p_partkey#9, p_mfgr#11]
+Input [4]: [p_partkey#9, p_mfgr#11, p_type#13, p_size#14]
+
+(4) BroadcastExchange
+Input [2]: [p_partkey#9, p_mfgr#11]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=314]
+
+(5) Scan parquet 
+Output [3]: [ps_partkey#37, ps_suppkey#38, ps_supplycost#40]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-partsupp]
+PushedFilters: [IsNotNull(ps_partkey), IsNotNull(ps_supplycost), IsNotNull(ps_suppkey)]
+ReadSchema: struct<ps_partkey:int,ps_suppkey:int,ps_supplycost:double>
+
+(6) Filter
+Input [3]: [ps_partkey#37, ps_suppkey#38, ps_supplycost#40]
+Condition : ((isnotnull(ps_partkey#37) AND isnotnull(ps_supplycost#40)) AND isnotnull(ps_suppkey#38))
+
+(7) BroadcastHashJoin
+Left keys [1]: [p_partkey#9]
+Right keys [1]: [ps_partkey#37]
+Join type: Inner
+Join condition: None
+
+(8) Project
+Output [4]: [p_partkey#9, p_mfgr#11, ps_suppkey#38, ps_supplycost#40]
+Input [5]: [p_partkey#9, p_mfgr#11, ps_partkey#37, ps_suppkey#38, ps_supplycost#40]
+
+(9) BroadcastExchange
+Input [4]: [p_partkey#9, p_mfgr#11, ps_suppkey#38, ps_supplycost#40]
+Arguments: HashedRelationBroadcastMode(List(knownfloatingpointnormalized(normalizenanandzero(input[3, double, true])), input[0, int, true]),false), [plan_id=334]
+
+(10) Scan parquet 
+Output [3]: [ps_partkey#125, ps_suppkey#126, ps_supplycost#128]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-partsupp]
+PushedFilters: [IsNotNull(ps_suppkey), IsNotNull(ps_partkey)]
+ReadSchema: struct<ps_partkey:int,ps_suppkey:int,ps_supplycost:double>
+
+(11) Filter
+Input [3]: [ps_partkey#125, ps_suppkey#126, ps_supplycost#128]
+Condition : (isnotnull(ps_suppkey#126) AND isnotnull(ps_partkey#125))
+
+(12) Scan parquet 
+Output [2]: [s_suppkey#130, s_nationkey#133]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-supplier]
+PushedFilters: [IsNotNull(s_suppkey), IsNotNull(s_nationkey)]
+ReadSchema: struct<s_suppkey:int,s_nationkey:int>
+
+(13) Filter
+Input [2]: [s_suppkey#130, s_nationkey#133]
+Condition : (isnotnull(s_suppkey#130) AND isnotnull(s_nationkey#133))
+
+(14) BroadcastExchange
+Input [2]: [s_suppkey#130, s_nationkey#133]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, false] as bigint)),false), [plan_id=317]
+
+(15) BroadcastHashJoin
+Left keys [1]: [ps_suppkey#126]
+Right keys [1]: [s_suppkey#130]
+Join type: Inner
+Join condition: None
+
+(16) Project
+Output [3]: [ps_partkey#125, ps_supplycost#128, s_nationkey#133]
+Input [5]: [ps_partkey#125, ps_suppkey#126, ps_supplycost#128, s_suppkey#130, s_nationkey#133]
+
+(17) Scan parquet 
+Output [2]: [n_nationkey#137, n_regionkey#139]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-nation]
+PushedFilters: [IsNotNull(n_nationkey), IsNotNull(n_regionkey)]
+ReadSchema: struct<n_nationkey:int,n_regionkey:int>
+
+(18) Filter
+Input [2]: [n_nationkey#137, n_regionkey#139]
+Condition : (isnotnull(n_nationkey#137) AND isnotnull(n_regionkey#139))
+
+(19) BroadcastExchange
+Input [2]: [n_nationkey#137, n_regionkey#139]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, false] as bigint)),false), [plan_id=321]
+
+(20) BroadcastHashJoin
+Left keys [1]: [s_nationkey#133]
+Right keys [1]: [n_nationkey#137]
+Join type: Inner
+Join condition: None
+
+(21) Project
+Output [3]: [ps_partkey#125, ps_supplycost#128, n_regionkey#139]
+Input [5]: [ps_partkey#125, ps_supplycost#128, s_nationkey#133, n_nationkey#137, n_regionkey#139]
+
+(22) Scan parquet 
+Output [2]: [r_regionkey#141, r_name#142]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-region]
+PushedFilters: [IsNotNull(r_name), EqualTo(r_name,EUROPE), IsNotNull(r_regionkey)]
+ReadSchema: struct<r_regionkey:int,r_name:string>
+
+(23) Filter
+Input [2]: [r_regionkey#141, r_name#142]
+Condition : ((isnotnull(r_name#142) AND (r_name#142 = EUROPE)) AND isnotnull(r_regionkey#141))
+
+(24) Project
+Output [1]: [r_regionkey#141]
+Input [2]: [r_regionkey#141, r_name#142]
+
+(25) BroadcastExchange
+Input [1]: [r_regionkey#141]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=325]
+
+(26) BroadcastHashJoin
+Left keys [1]: [n_regionkey#139]
+Right keys [1]: [r_regionkey#141]
+Join type: Inner
+Join condition: None
+
+(27) Project
+Output [2]: [ps_partkey#125, ps_supplycost#128]
+Input [4]: [ps_partkey#125, ps_supplycost#128, n_regionkey#139, r_regionkey#141]
+
+(28) HashAggregate
+Input [2]: [ps_partkey#125, ps_supplycost#128]
+Keys [1]: [ps_partkey#125]
+Functions [1]: [partial_min(ps_supplycost#128)]
+Aggregate Attributes [1]: [min#144]
+Results [2]: [ps_partkey#125, min#145]
+
+(29) Exchange
+Input [2]: [ps_partkey#125, min#145]
+Arguments: hashpartitioning(ps_partkey#125, 200), ENSURE_REQUIREMENTS, [plan_id=330]
+
+(30) HashAggregate
+Input [2]: [ps_partkey#125, min#145]
+Keys [1]: [ps_partkey#125]
+Functions [1]: [min(ps_supplycost#128)]
+Aggregate Attributes [1]: [min(ps_supplycost#128)#123]
+Results [2]: [min(ps_supplycost#128)#123 AS min(ps_supplycost)#124, ps_partkey#125]
+
+(31) Filter
+Input [2]: [min(ps_supplycost)#124, ps_partkey#125]
+Condition : isnotnull(min(ps_supplycost)#124)
+
+(32) BroadcastHashJoin
+Left keys [2]: [knownfloatingpointnormalized(normalizenanandzero(ps_supplycost#40)), p_partkey#9]
+Right keys [2]: [knownfloatingpointnormalized(normalizenanandzero(min(ps_supplycost)#124)), ps_partkey#125]
+Join type: Inner
+Join condition: None
+
+(33) Project
+Output [3]: [p_partkey#9, p_mfgr#11, ps_suppkey#38]
+Input [6]: [p_partkey#9, p_mfgr#11, ps_suppkey#38, ps_supplycost#40, min(ps_supplycost)#124, ps_partkey#125]
+
+(34) Scan parquet 
+Output [7]: [s_suppkey#25, s_name#26, s_address#27, s_nationkey#28, s_phone#29, s_acctbal#30, s_comment#31]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-supplier]
+PushedFilters: [IsNotNull(s_suppkey), IsNotNull(s_nationkey)]
+ReadSchema: struct<s_suppkey:int,s_name:string,s_address:string,s_nationkey:int,s_phone:string,s_acctbal:double,s_comment:string>
+
+(35) Filter
+Input [7]: [s_suppkey#25, s_name#26, s_address#27, s_nationkey#28, s_phone#29, s_acctbal#30, s_comment#31]
+Condition : (isnotnull(s_suppkey#25) AND isnotnull(s_nationkey#28))
+
+(36) BroadcastExchange
+Input [7]: [s_suppkey#25, s_name#26, s_address#27, s_nationkey#28, s_phone#29, s_acctbal#30, s_comment#31]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, false] as bigint)),false), [plan_id=338]
+
+(37) BroadcastHashJoin
+Left keys [1]: [ps_suppkey#38]
+Right keys [1]: [s_suppkey#25]
+Join type: Inner
+Join condition: None
+
+(38) Project
+Output [8]: [p_partkey#9, p_mfgr#11, s_name#26, s_address#27, s_nationkey#28, s_phone#29, s_acctbal#30, s_comment#31]
+Input [10]: [p_partkey#9, p_mfgr#11, ps_suppkey#38, s_suppkey#25, s_name#26, s_address#27, s_nationkey#28, s_phone#29, s_acctbal#30, s_comment#31]
+
+(39) Scan parquet 
+Output [3]: [n_nationkey#112, n_name#113, n_regionkey#114]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-nation]
+PushedFilters: [IsNotNull(n_nationkey), IsNotNull(n_regionkey)]
+ReadSchema: struct<n_nationkey:int,n_name:string,n_regionkey:int>
+
+(40) Filter
+Input [3]: [n_nationkey#112, n_name#113, n_regionkey#114]
+Condition : (isnotnull(n_nationkey#112) AND isnotnull(n_regionkey#114))
+
+(41) BroadcastExchange
+Input [3]: [n_nationkey#112, n_name#113, n_regionkey#114]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, false] as bigint)),false), [plan_id=342]
+
+(42) BroadcastHashJoin
+Left keys [1]: [s_nationkey#28]
+Right keys [1]: [n_nationkey#112]
+Join type: Inner
+Join condition: None
+
+(43) Project
+Output [9]: [p_partkey#9, p_mfgr#11, s_name#26, s_address#27, s_phone#29, s_acctbal#30, s_comment#31, n_name#113, n_regionkey#114]
+Input [11]: [p_partkey#9, p_mfgr#11, s_name#26, s_address#27, s_nationkey#28, s_phone#29, s_acctbal#30, s_comment#31, n_nationkey#112, n_name#113, n_regionkey#114]
+
+(44) Scan parquet 
+Output [2]: [r_regionkey#119, r_name#120]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-region]
+PushedFilters: [IsNotNull(r_name), EqualTo(r_name,EUROPE), IsNotNull(r_regionkey)]
+ReadSchema: struct<r_regionkey:int,r_name:string>
+
+(45) Filter
+Input [2]: [r_regionkey#119, r_name#120]
+Condition : ((isnotnull(r_name#120) AND (r_name#120 = EUROPE)) AND isnotnull(r_regionkey#119))
+
+(46) Project
+Output [1]: [r_regionkey#119]
+Input [2]: [r_regionkey#119, r_name#120]
+
+(47) BroadcastExchange
+Input [1]: [r_regionkey#119]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=346]
+
+(48) BroadcastHashJoin
+Left keys [1]: [n_regionkey#114]
+Right keys [1]: [r_regionkey#119]
+Join type: Inner
+Join condition: None
+
+(49) Project
+Output [8]: [s_name#26, s_acctbal#30, n_name#113, p_partkey#9, p_mfgr#11, s_address#27, s_phone#29, s_comment#31]
+Input [10]: [p_partkey#9, p_mfgr#11, s_name#26, s_address#27, s_phone#29, s_acctbal#30, s_comment#31, n_name#113, n_regionkey#114, r_regionkey#119]
+
+(50) TakeOrderedAndProject
+Input [8]: [s_name#26, s_acctbal#30, n_name#113, p_partkey#9, p_mfgr#11, s_address#27, s_phone#29, s_comment#31]
+Arguments: 100, [s_acctbal#30 DESC NULLS LAST, n_name#113 ASC NULLS FIRST, s_name#26 ASC NULLS FIRST, p_partkey#9 ASC NULLS FIRST], [s_name#26, s_acctbal#30, n_name#113, p_partkey#9, p_mfgr#11, s_address#27, s_phone#29, s_comment#31]
+
+(51) AdaptiveSparkPlan
+Output [8]: [s_name#26, s_acctbal#30, n_name#113, p_partkey#9, p_mfgr#11, s_address#27, s_phone#29, s_comment#31]
+Arguments: isFinalPlan=false
+
+

@@ -1,0 +1,209 @@
+# Captured by parsing/regenerate.py with pyspark 4.2.0. Do not edit; regenerate with `make plans Q=18`.
+== Physical Plan ==
+AdaptiveSparkPlan (33)
++- TakeOrderedAndProject (32)
+   +- HashAggregate (31)
+      +- Exchange (30)
+         +- HashAggregate (29)
+            +- Project (28)
+               +- BroadcastHashJoin Inner BuildRight (27)
+                  :- Project (15)
+                  :  +- BroadcastHashJoin Inner BuildLeft (14)
+                  :     :- BroadcastExchange (3)
+                  :     :  +- Filter (2)
+                  :     :     +- Scan parquet  (1)
+                  :     +- BroadcastHashJoin LeftSemi BuildRight (13)
+                  :        :- Filter (5)
+                  :        :  +- Scan parquet  (4)
+                  :        +- BroadcastExchange (12)
+                  :           +- Project (11)
+                  :              +- Filter (10)
+                  :                 +- HashAggregate (9)
+                  :                    +- Exchange (8)
+                  :                       +- HashAggregate (7)
+                  :                          +- Scan parquet  (6)
+                  +- BroadcastExchange (26)
+                     +- BroadcastHashJoin LeftSemi BuildRight (25)
+                        :- Filter (17)
+                        :  +- Scan parquet  (16)
+                        +- BroadcastExchange (24)
+                           +- Project (23)
+                              +- Filter (22)
+                                 +- HashAggregate (21)
+                                    +- Exchange (20)
+                                       +- HashAggregate (19)
+                                          +- Scan parquet  (18)
+
+
+(1) Scan parquet 
+Output [2]: [c_custkey#50, c_name#51]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-customer]
+PushedFilters: [IsNotNull(c_custkey)]
+ReadSchema: struct<c_custkey:int,c_name:string>
+
+(2) Filter
+Input [2]: [c_custkey#50, c_name#51]
+Condition : isnotnull(c_custkey#50)
+
+(3) BroadcastExchange
+Input [2]: [c_custkey#50, c_name#51]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, false] as bigint)),false), [plan_id=257]
+
+(4) Scan parquet 
+Output [4]: [o_orderkey#67, o_custkey#68, o_totalprice#70, o_orderdate#71]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-orders]
+PushedFilters: [IsNotNull(o_custkey), IsNotNull(o_orderkey)]
+ReadSchema: struct<o_orderkey:int,o_custkey:int,o_totalprice:double,o_orderdate:date>
+
+(5) Filter
+Input [4]: [o_orderkey#67, o_custkey#68, o_totalprice#70, o_orderdate#71]
+Condition : (isnotnull(o_custkey#68) AND isnotnull(o_orderkey#67))
+
+(6) Scan parquet 
+Output [2]: [l_orderkey#125, l_quantity#129]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-lineitem]
+ReadSchema: struct<l_orderkey:int,l_quantity:int>
+
+(7) HashAggregate
+Input [2]: [l_orderkey#125, l_quantity#129]
+Keys [1]: [l_orderkey#125]
+Functions [1]: [partial_sum(l_quantity#129)]
+Aggregate Attributes [1]: [sum#145L]
+Results [2]: [l_orderkey#125, sum#146L]
+
+(8) Exchange
+Input [2]: [l_orderkey#125, sum#146L]
+Arguments: hashpartitioning(l_orderkey#125, 200), ENSURE_REQUIREMENTS, [plan_id=249]
+
+(9) HashAggregate
+Input [2]: [l_orderkey#125, sum#146L]
+Keys [1]: [l_orderkey#125]
+Functions [1]: [sum(l_quantity#129)]
+Aggregate Attributes [1]: [sum(l_quantity#129)#123L]
+Results [2]: [l_orderkey#125, sum(l_quantity#129)#123L AS sum(l_quantity)#124L]
+
+(10) Filter
+Input [2]: [l_orderkey#125, sum(l_quantity)#124L]
+Condition : (isnotnull(sum(l_quantity)#124L) AND (sum(l_quantity)#124L > 300))
+
+(11) Project
+Output [1]: [l_orderkey#125]
+Input [2]: [l_orderkey#125, sum(l_quantity)#124L]
+
+(12) BroadcastExchange
+Input [1]: [l_orderkey#125]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=254]
+
+(13) BroadcastHashJoin
+Left keys [1]: [o_orderkey#67]
+Right keys [1]: [l_orderkey#125]
+Join type: LeftSemi
+Join condition: None
+
+(14) BroadcastHashJoin
+Left keys [1]: [c_custkey#50]
+Right keys [1]: [o_custkey#68]
+Join type: Inner
+Join condition: None
+
+(15) Project
+Output [5]: [c_custkey#50, c_name#51, o_orderkey#67, o_totalprice#70, o_orderdate#71]
+Input [6]: [c_custkey#50, c_name#51, o_orderkey#67, o_custkey#68, o_totalprice#70, o_orderdate#71]
+
+(16) Scan parquet 
+Output [2]: [l_orderkey#92, l_quantity#96]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-lineitem]
+PushedFilters: [IsNotNull(l_orderkey)]
+ReadSchema: struct<l_orderkey:int,l_quantity:int>
+
+(17) Filter
+Input [2]: [l_orderkey#92, l_quantity#96]
+Condition : isnotnull(l_orderkey#92)
+
+(18) Scan parquet 
+Output [2]: [l_orderkey#125, l_quantity#129]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-lineitem]
+ReadSchema: struct<l_orderkey:int,l_quantity:int>
+
+(19) HashAggregate
+Input [2]: [l_orderkey#125, l_quantity#129]
+Keys [1]: [l_orderkey#125]
+Functions [1]: [partial_sum(l_quantity#129)]
+Aggregate Attributes [1]: [sum#145L]
+Results [2]: [l_orderkey#125, sum#146L]
+
+(20) Exchange
+Input [2]: [l_orderkey#125, sum#146L]
+Arguments: hashpartitioning(l_orderkey#125, 200), ENSURE_REQUIREMENTS, [plan_id=260]
+
+(21) HashAggregate
+Input [2]: [l_orderkey#125, sum#146L]
+Keys [1]: [l_orderkey#125]
+Functions [1]: [sum(l_quantity#129)]
+Aggregate Attributes [1]: [sum(l_quantity#129)#123L]
+Results [2]: [l_orderkey#125, sum(l_quantity#129)#123L AS sum(l_quantity)#124L]
+
+(22) Filter
+Input [2]: [l_orderkey#125, sum(l_quantity)#124L]
+Condition : (isnotnull(sum(l_quantity)#124L) AND (sum(l_quantity)#124L > 300))
+
+(23) Project
+Output [1]: [l_orderkey#125]
+Input [2]: [l_orderkey#125, sum(l_quantity)#124L]
+
+(24) BroadcastExchange
+Input [1]: [l_orderkey#125]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=265]
+
+(25) BroadcastHashJoin
+Left keys [1]: [l_orderkey#92]
+Right keys [1]: [l_orderkey#125]
+Join type: LeftSemi
+Join condition: None
+
+(26) BroadcastExchange
+Input [2]: [l_orderkey#92, l_quantity#96]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, false] as bigint)),false), [plan_id=268]
+
+(27) BroadcastHashJoin
+Left keys [1]: [o_orderkey#67]
+Right keys [1]: [l_orderkey#92]
+Join type: Inner
+Join condition: None
+
+(28) Project
+Output [6]: [c_custkey#50, c_name#51, o_orderkey#67, o_totalprice#70, o_orderdate#71, l_quantity#96]
+Input [7]: [c_custkey#50, c_name#51, o_orderkey#67, o_totalprice#70, o_orderdate#71, l_orderkey#92, l_quantity#96]
+
+(29) HashAggregate
+Input [6]: [c_custkey#50, c_name#51, o_orderkey#67, o_totalprice#70, o_orderdate#71, l_quantity#96]
+Keys [5]: [c_name#51, c_custkey#50, o_orderkey#67, o_orderdate#71, knownfloatingpointnormalized(normalizenanandzero(o_totalprice#70)) AS o_totalprice#70]
+Functions [1]: [partial_sum(l_quantity#96)]
+Aggregate Attributes [1]: [sum#143L]
+Results [6]: [c_name#51, c_custkey#50, o_orderkey#67, o_orderdate#71, o_totalprice#70, sum#144L]
+
+(30) Exchange
+Input [6]: [c_name#51, c_custkey#50, o_orderkey#67, o_orderdate#71, o_totalprice#70, sum#144L]
+Arguments: hashpartitioning(c_name#51, c_custkey#50, o_orderkey#67, o_orderdate#71, o_totalprice#70, 200), ENSURE_REQUIREMENTS, [plan_id=273]
+
+(31) HashAggregate
+Input [6]: [c_name#51, c_custkey#50, o_orderkey#67, o_orderdate#71, o_totalprice#70, sum#144L]
+Keys [5]: [c_name#51, c_custkey#50, o_orderkey#67, o_orderdate#71, o_totalprice#70]
+Functions [1]: [sum(l_quantity#96)]
+Aggregate Attributes [1]: [sum(l_quantity#96)#141L]
+Results [6]: [c_name#51, c_custkey#50, o_orderkey#67, o_orderdate#71, o_totalprice#70, sum(l_quantity#96)#141L AS sum(l_quantity)#142L]
+
+(32) TakeOrderedAndProject
+Input [6]: [c_name#51, c_custkey#50, o_orderkey#67, o_orderdate#71, o_totalprice#70, sum(l_quantity)#142L]
+Arguments: 100, [o_totalprice#70 DESC NULLS LAST, o_orderdate#71 ASC NULLS FIRST], [c_name#51, c_custkey#50, o_orderkey#67, o_orderdate#71, o_totalprice#70, sum(l_quantity)#142L]
+
+(33) AdaptiveSparkPlan
+Output [6]: [c_name#51, c_custkey#50, o_orderkey#67, o_orderdate#71, o_totalprice#70, sum(l_quantity)#142L]
+Arguments: isFinalPlan=false
+
+

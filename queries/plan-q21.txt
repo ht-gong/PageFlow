@@ -1,0 +1,203 @@
+# Captured by parsing/regenerate.py with pyspark 4.2.0. Do not edit; regenerate with `make plans Q=21`.
+== Physical Plan ==
+AdaptiveSparkPlan (33)
++- TakeOrderedAndProject (32)
+   +- HashAggregate (31)
+      +- Exchange (30)
+         +- HashAggregate (29)
+            +- Project (28)
+               +- BroadcastHashJoin Inner BuildRight (27)
+                  :- Project (22)
+                  :  +- BroadcastHashJoin Inner BuildRight (21)
+                  :     :- Project (16)
+                  :     :  +- BroadcastHashJoin Inner BuildRight (15)
+                  :     :     :- Filter (2)
+                  :     :     :  +- Scan parquet  (1)
+                  :     :     +- BroadcastExchange (14)
+                  :     :        +- BroadcastHashJoin LeftAnti BuildRight (13)
+                  :     :           :- BroadcastHashJoin LeftSemi BuildRight (8)
+                  :     :           :  :- Project (5)
+                  :     :           :  :  +- Filter (4)
+                  :     :           :  :     +- Scan parquet  (3)
+                  :     :           :  +- BroadcastExchange (7)
+                  :     :           :     +- Scan parquet  (6)
+                  :     :           +- BroadcastExchange (12)
+                  :     :              +- Project (11)
+                  :     :                 +- Filter (10)
+                  :     :                    +- Scan parquet  (9)
+                  :     +- BroadcastExchange (20)
+                  :        +- Project (19)
+                  :           +- Filter (18)
+                  :              +- Scan parquet  (17)
+                  +- BroadcastExchange (26)
+                     +- Project (25)
+                        +- Filter (24)
+                           +- Scan parquet  (23)
+
+
+(1) Scan parquet 
+Output [3]: [s_suppkey#25, s_name#26, s_nationkey#28]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-supplier]
+PushedFilters: [IsNotNull(s_suppkey), IsNotNull(s_nationkey)]
+ReadSchema: struct<s_suppkey:int,s_name:string,s_nationkey:int>
+
+(2) Filter
+Input [3]: [s_suppkey#25, s_name#26, s_nationkey#28]
+Condition : (isnotnull(s_suppkey#25) AND isnotnull(s_nationkey#28))
+
+(3) Scan parquet 
+Output [4]: [l_orderkey#92, l_suppkey#94, l_commitdate#103, l_receiptdate#104]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-lineitem]
+PushedFilters: [IsNotNull(l_receiptdate), IsNotNull(l_commitdate), IsNotNull(l_suppkey), IsNotNull(l_orderkey)]
+ReadSchema: struct<l_orderkey:int,l_suppkey:int,l_commitdate:date,l_receiptdate:date>
+
+(4) Filter
+Input [4]: [l_orderkey#92, l_suppkey#94, l_commitdate#103, l_receiptdate#104]
+Condition : ((((isnotnull(l_receiptdate#104) AND isnotnull(l_commitdate#103)) AND (l_receiptdate#104 > l_commitdate#103)) AND isnotnull(l_suppkey#94)) AND isnotnull(l_orderkey#92))
+
+(5) Project
+Output [2]: [l_orderkey#92, l_suppkey#94]
+Input [4]: [l_orderkey#92, l_suppkey#94, l_commitdate#103, l_receiptdate#104]
+
+(6) Scan parquet 
+Output [2]: [l_orderkey#126, l_suppkey#128]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-lineitem]
+ReadSchema: struct<l_orderkey:int,l_suppkey:int>
+
+(7) BroadcastExchange
+Input [2]: [l_orderkey#126, l_suppkey#128]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=243]
+
+(8) BroadcastHashJoin
+Left keys [1]: [l_orderkey#92]
+Right keys [1]: [l_orderkey#126]
+Join type: LeftSemi
+Join condition: NOT (l_suppkey#128 = l_suppkey#94)
+
+(9) Scan parquet 
+Output [4]: [l_orderkey#142, l_suppkey#144, l_commitdate#153, l_receiptdate#154]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-lineitem]
+PushedFilters: [IsNotNull(l_receiptdate), IsNotNull(l_commitdate)]
+ReadSchema: struct<l_orderkey:int,l_suppkey:int,l_commitdate:date,l_receiptdate:date>
+
+(10) Filter
+Input [4]: [l_orderkey#142, l_suppkey#144, l_commitdate#153, l_receiptdate#154]
+Condition : ((isnotnull(l_receiptdate#154) AND isnotnull(l_commitdate#153)) AND (l_receiptdate#154 > l_commitdate#153))
+
+(11) Project
+Output [2]: [l_orderkey#142, l_suppkey#144]
+Input [4]: [l_orderkey#142, l_suppkey#144, l_commitdate#153, l_receiptdate#154]
+
+(12) BroadcastExchange
+Input [2]: [l_orderkey#142, l_suppkey#144]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=246]
+
+(13) BroadcastHashJoin
+Left keys [1]: [l_orderkey#92]
+Right keys [1]: [l_orderkey#142]
+Join type: LeftAnti
+Join condition: NOT (l_suppkey#144 = l_suppkey#94)
+
+(14) BroadcastExchange
+Input [2]: [l_orderkey#92, l_suppkey#94]
+Arguments: HashedRelationBroadcastMode(List(cast(input[1, int, true] as bigint)),false), [plan_id=249]
+
+(15) BroadcastHashJoin
+Left keys [1]: [s_suppkey#25]
+Right keys [1]: [l_suppkey#94]
+Join type: Inner
+Join condition: None
+
+(16) Project
+Output [3]: [s_name#26, s_nationkey#28, l_orderkey#92]
+Input [5]: [s_suppkey#25, s_name#26, s_nationkey#28, l_orderkey#92, l_suppkey#94]
+
+(17) Scan parquet 
+Output [2]: [o_orderkey#67, o_orderstatus#69]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-orders]
+PushedFilters: [IsNotNull(o_orderstatus), EqualTo(o_orderstatus,F), IsNotNull(o_orderkey)]
+ReadSchema: struct<o_orderkey:int,o_orderstatus:string>
+
+(18) Filter
+Input [2]: [o_orderkey#67, o_orderstatus#69]
+Condition : ((isnotnull(o_orderstatus#69) AND (o_orderstatus#69 = F)) AND isnotnull(o_orderkey#67))
+
+(19) Project
+Output [1]: [o_orderkey#67]
+Input [2]: [o_orderkey#67, o_orderstatus#69]
+
+(20) BroadcastExchange
+Input [1]: [o_orderkey#67]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=253]
+
+(21) BroadcastHashJoin
+Left keys [1]: [l_orderkey#92]
+Right keys [1]: [o_orderkey#67]
+Join type: Inner
+Join condition: None
+
+(22) Project
+Output [2]: [s_name#26, s_nationkey#28]
+Input [4]: [s_name#26, s_nationkey#28, l_orderkey#92, o_orderkey#67]
+
+(23) Scan parquet 
+Output [2]: [n_nationkey#112, n_name#113]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-nation]
+PushedFilters: [IsNotNull(n_name), EqualTo(n_name,SAUDI ARABIA), IsNotNull(n_nationkey)]
+ReadSchema: struct<n_nationkey:int,n_name:string>
+
+(24) Filter
+Input [2]: [n_nationkey#112, n_name#113]
+Condition : ((isnotnull(n_name#113) AND (n_name#113 = SAUDI ARABIA)) AND isnotnull(n_nationkey#112))
+
+(25) Project
+Output [1]: [n_nationkey#112]
+Input [2]: [n_nationkey#112, n_name#113]
+
+(26) BroadcastExchange
+Input [1]: [n_nationkey#112]
+Arguments: HashedRelationBroadcastMode(List(cast(input[0, int, true] as bigint)),false), [plan_id=257]
+
+(27) BroadcastHashJoin
+Left keys [1]: [s_nationkey#28]
+Right keys [1]: [n_nationkey#112]
+Join type: Inner
+Join condition: None
+
+(28) Project
+Output [1]: [s_name#26]
+Input [3]: [s_name#26, s_nationkey#28, n_nationkey#112]
+
+(29) HashAggregate
+Input [1]: [s_name#26]
+Keys [1]: [s_name#26]
+Functions [1]: [partial_count(1)]
+Aggregate Attributes [1]: [count#158L]
+Results [2]: [s_name#26, count#159L]
+
+(30) Exchange
+Input [2]: [s_name#26, count#159L]
+Arguments: hashpartitioning(s_name#26, 200), ENSURE_REQUIREMENTS, [plan_id=262]
+
+(31) HashAggregate
+Input [2]: [s_name#26, count#159L]
+Keys [1]: [s_name#26]
+Functions [1]: [count(1)]
+Aggregate Attributes [1]: [count(1)#125L]
+Results [2]: [s_name#26, count(1)#125L AS numwait#122L]
+
+(32) TakeOrderedAndProject
+Input [2]: [s_name#26, numwait#122L]
+Arguments: 100, [numwait#122L DESC NULLS LAST, s_name#26 ASC NULLS FIRST], [s_name#26, numwait#122L]
+
+(33) AdaptiveSparkPlan
+Output [2]: [s_name#26, numwait#122L]
+Arguments: isFinalPlan=false
+
+

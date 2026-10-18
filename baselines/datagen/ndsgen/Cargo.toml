@@ -1,0 +1,19 @@
+[package]
+name = "ndsgen"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "TPC-H straight to NDS-H-layout parquet: tpchgen-rs rows, Spark's batch shuffle, parquet-mr's encodings"
+
+[dependencies]
+tpchgen = "=3.0.0"
+tpchgen-arrow = "=3.0.0"
+arrow = { version = "59", default-features = false }
+parquet = { version = "59", default-features = false, features = ["arrow", "zstd", "snap", "lz4"] }
+rayon = "1"
+serde_json = "1"
+clap = { version = "4.5", features = ["derive"] }
+mimalloc = { version = "0.1", default-features = false }
+
+[profile.release]
+debug = false

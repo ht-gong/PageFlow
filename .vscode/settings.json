@@ -1,0 +1,7 @@
+{
+  "files.associations": {
+    "*.cuh": "cuda-cpp",
+    "atomic": "cpp",
+    "utility": "cpp"
+  }
+}

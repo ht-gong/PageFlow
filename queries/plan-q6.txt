@@ -1,0 +1,49 @@
+# Captured by parsing/regenerate.py with pyspark 4.2.0. Do not edit; regenerate with `make plans Q=6`.
+== Physical Plan ==
+AdaptiveSparkPlan (7)
++- HashAggregate (6)
+   +- Exchange (5)
+      +- HashAggregate (4)
+         +- Project (3)
+            +- Filter (2)
+               +- Scan parquet  (1)
+
+
+(1) Scan parquet 
+Output [4]: [l_quantity#96, l_extendedprice#97, l_discount#98, l_shipdate#102]
+Batched: true
+Location: InMemoryFileIndex [file:./tmp/tmpfile-lineitem]
+PushedFilters: [IsNotNull(l_shipdate), IsNotNull(l_discount), IsNotNull(l_quantity), GreaterThanOrEqual(l_shipdate,1994-01-01), LessThan(l_shipdate,1995-01-01), GreaterThanOrEqual(l_discount,0.05), LessThanOrEqual(l_discount,0.07), LessThan(l_quantity,24)]
+ReadSchema: struct<l_quantity:int,l_extendedprice:double,l_discount:double,l_shipdate:date>
+
+(2) Filter
+Input [4]: [l_quantity#96, l_extendedprice#97, l_discount#98, l_shipdate#102]
+Condition : (((((((isnotnull(l_shipdate#102) AND isnotnull(l_discount#98)) AND isnotnull(l_quantity#96)) AND (l_shipdate#102 >= 1994-01-01)) AND (l_shipdate#102 < 1995-01-01)) AND (l_discount#98 >= 0.05)) AND (l_discount#98 <= 0.07)) AND (l_quantity#96 < 24))
+
+(3) Project
+Output [2]: [l_extendedprice#97, l_discount#98]
+Input [4]: [l_quantity#96, l_extendedprice#97, l_discount#98, l_shipdate#102]
+
+(4) HashAggregate
+Input [2]: [l_extendedprice#97, l_discount#98]
+Keys: []
+Functions [1]: [partial_sum((l_extendedprice#97 * l_discount#98))]
+Aggregate Attributes [1]: [sum#124]
+Results [1]: [sum#125]
+
+(5) Exchange
+Input [1]: [sum#125]
+Arguments: SinglePartition, ENSURE_REQUIREMENTS, [plan_id=159]
+
+(6) HashAggregate
+Input [1]: [sum#125]
+Keys: []
+Functions [1]: [sum((l_extendedprice#97 * l_discount#98))]
+Aggregate Attributes [1]: [sum((l_extendedprice#97 * l_discount#98))#123]
+Results [1]: [sum((l_extendedprice#97 * l_discount#98))#123 AS revenue#122]
+
+(7) AdaptiveSparkPlan
+Output [1]: [revenue#122]
+Arguments: isFinalPlan=false
+
+

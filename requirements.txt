@@ -1,0 +1,15 @@
+pandas
+# Exact pins: the checked-in plan text and pickles are reproducible only under
+# these versions.  pyspark numbers the plan columns (queries/plan-q*.txt) and
+# parsing/regenerate.py refuses to capture under any other version; pyparsing
+# shapes the expression trees lowered into queries/pickles/.  Changing either
+# means `make build && make plans` and regenerating queries/dataflow/.
+pyspark==4.2.0
+pyparsing==3.3.3
+pytest
+# cuDF's parquet reader, with RMM (Python 3.11 or later).  Its libcudf pins
+# nvidia-libnvcomp-cu12 5.2.0.13, the one nvCOMP the engine links (Dockerfile);
+# the releases before it pin 5.1.0.21, whose batched manager compress faults in
+# the engine.
+pylibcudf-cu12==26.6.0
+# torch_scatter
