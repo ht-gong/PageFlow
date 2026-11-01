@@ -1216,8 +1216,7 @@ import, so setting it inside a running process changes nothing. Every one is on-
   the disk at once:
   1. `make -C baselines image` (both Sirius builds), then the format map:
      `make -C baselines ablation SF=5` writes `baselines/results/format_map.json`
-     and `format_profile.csv` (never committed; the paper's are on
-     `archive/results-2026-10-26`, `main-checkout/baselines/results/`).
+     and `format_profile.csv` (never committed).
   2. `python3 experiments/paper_scripts/e1_motivation.py` lists every
      (engine, SF) with queries left and whether its data is ready.
   3. Per cell: `make -C baselines engine-data CMD="make <engine> <SF>"` (the
@@ -1269,8 +1268,8 @@ the code that writes and reads them.
   imputed or relabelled number in its source. A value that is not a
   measurement (an estimate) comes from a file of its own and is labelled as
   one in the figure.
-- **Keeping a result set** (for a paper): archive it outside `main` (an orphan
-  `archive/results-<date>` branch), with what made each file. The drivers' CSVs
+- **Keeping a result set** (for a paper): archive it outside `main` (a branch
+  of its own), with what made each file. The drivers' CSVs
   carry `commit` (`+dirty` for an uncommitted tree), `flags` and `gpu` per row,
   and a perf report's `cmdline.json` the resolved settings.
 
@@ -1288,10 +1287,9 @@ parentheses), so it can read a result set wherever it is kept:
 | `experiments/paper_scripts/results/ablation_profile.csv` (`--profile`) | E4 | `make_ablation_fig.py`, `make_query_breakdown_fig.py` |
 | `profiling/results/codec_map.json`, `sweep_per_column.csv`, `sweep_by_class.csv`, `scan_frequency.csv` | `make profiling` | the engine (`codec_map.json`); `make_regret_fig.py` |
 
-Four figure inputs have no producer on main. A script stops without a
-required one and leaves an optional one's part out. The last copies of these
-files are on the orphan branch `archive/results-2026-10-26` (data only: the
-one-off harnesses that made them were not kept):
+Four figure inputs have no producer on main (the one-off harnesses that made
+them were not kept). A script stops without a required one and leaves an
+optional one's part out:
 
 | Input | Read by | What it must hold |
 |---|---|---|
