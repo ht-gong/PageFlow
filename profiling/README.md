@@ -76,15 +76,13 @@ engine-image container mounts it (read-only except `profiling`).
 |------|---------|----------|
 | `codec_map.json` | **`compression/format_policy.py`** (the only engine reader); `make_regret_fig.py` reads `codec` | `codec`: `{type: {unsorted, sorted}}` over the four mapped types, values `RAW` or a codec; `settings`: `{codec: {chunk_b}}` for exactly the seven codecs. Any other shape is rejected at engine startup. |
 | `sweep_per_column.csv` | `make_regret_fig.py` | One row per (column, run, codec, chunk): `table, column, type, run, is_pk, scan_freq, raw_bytes, codec, chunk_b, selected, ratio, compress_s, d2h_s, h2d_s, decompress_s, raw_d2h_s, raw_h2d_s`. `selected = 1` on the rows whose `chunk_b` is the codec's shipped chunk; consumers filter on it and never handle chunk sizes. |
-| `sweep_by_class.csv` | `make_pareto_fig.py`, humans | Byte-weighted aggregates per (type, run, codec, chunk): ratio, the four legs and the cost in s/GB, plus `selected`, `on_pareto`, `is_best`, `stable`. RAW appears as a row per class. |
+| `sweep_by_class.csv` | humans | Byte-weighted aggregates per (type, run, codec, chunk): ratio, the four legs and the cost in s/GB, plus `selected`, `on_pareto`, `is_best`, `stable`. RAW appears as a row per class. |
 | `scan_frequency.csv` | humans | Per scanned column: type, whether it is its table's primary key (`is_pk`), how many queries scan it, workload scanned bytes. |
 
-The figures over these CSVs live in `experiments/paper_scripts/figures/`:
-`make_regret_fig.py` (the per-class cost of one codec per class against the
-per-column best, in measured time) and `make_pareto_fig.py` (cost against
-ratio per class, every codec at its shipped chunk). Both only plot the
-shipped map and write to `experiments/paper_scripts/figures/plot/`,
-which is gitignored.
+The figure over these CSVs is `experiments/paper_scripts/figures/make_regret_fig.py`
+(the per-class cost of one codec per class against the per-column best, in
+measured time). It only plots the shipped map and writes
+`experiments/paper_scripts/results/fig_regret.pdf`, which is gitignored.
 
 ## Files
 

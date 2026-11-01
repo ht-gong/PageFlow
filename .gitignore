@@ -12,16 +12,18 @@ experiments/figures
 *.so
 .DS_Store
 debug.out
+# Timing and result files are never committed (AGENTS.md, "Results are never committed")
 *.csv
 scratchpad/
 .claude/
 fig-01-motivation*.png
-# Figures the experiment scripts render (every script writes under a plot/ subfolder)
-experiments/paper_scripts/figures/plot/
 
 # Docker: mounted data + run outputs
 /data/
 /out/
+# Sirius's own log and quent telemetry, when it runs from the repo root
+/log/
+/telemetry_data/
 
 # Box settings, read by the Makefile, bench/run_tqp.sh and baselines/docker/run.sh
 # (copy local.env.example)

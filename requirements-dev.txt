@@ -2,3 +2,5 @@
 # requirements.txt; these back experiments/ and profiling/.
 matplotlib
 numpy
+# NVML's GPM metrics: E4's GPU sampler (experiments/paper_scripts/helpers/gpm_sampler.py)
+nvidia-ml-py

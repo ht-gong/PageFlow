@@ -93,15 +93,17 @@ RUN python3 -m venv /opt/envs/polars \
 # experimental/starrocks ones), its toolchain from its own pixi.lock (--frozen),
 # `make` as upstream documents, for H100 only. The binary's RPATH points at the
 # env's lib dir, so the final stage keeps that dir at the same path.
-FROM build AS sirius-build
+FROM build AS pixi
 ARG PIXI_URL
 ARG PIXI_SHA256
-ARG SIRIUS_URL
-ARG SIRIUS_REF
-ARG SIRIUS_CUDAARCHS
 RUN curl -fsSL -o /tmp/pixi.tgz "${PIXI_URL}" \
  && echo "${PIXI_SHA256}  /tmp/pixi.tgz" | sha256sum -c - \
  && tar xzf /tmp/pixi.tgz -C /usr/local/bin pixi && rm /tmp/pixi.tgz
+
+FROM pixi AS sirius-build
+ARG SIRIUS_URL
+ARG SIRIUS_REF
+ARG SIRIUS_CUDAARCHS
 RUN git clone -q "${SIRIUS_URL}" /opt/envs/sirius \
  && cd /opt/envs/sirius && git checkout -q "${SIRIUS_REF}" \
  && git submodule update --init --recursive -- \
@@ -119,6 +121,29 @@ RUN E=/opt/envs/sirius/.pixi/envs/default \
  && find /opt/sirius-rt/lib -name '*.a' -delete \
  && cp -a "$E/targets/x86_64-linux/lib" /opt/sirius-rt/targets/x86_64-linux/lib
 
+# ------------------------------------------------------------------ sirius-host-build
+# The second Sirius, for the `sirius_host` engine key (run.sh): the same build
+# at SIRIUS_HOST_REF, in its own directory, so its RPATH names its own env.
+FROM pixi AS sirius-host-build
+ARG SIRIUS_URL
+ARG SIRIUS_HOST_REF
+ARG SIRIUS_CUDAARCHS
+RUN git clone -q "${SIRIUS_URL}" /opt/envs/sirius-host \
+ && cd /opt/envs/sirius-host && git checkout -q "${SIRIUS_HOST_REF}" \
+ && git submodule update --init --recursive -- \
+      $(git config -f .gitmodules --get-regexp '\.path$' | awk '{print $2}' | grep -v '^experimental/')
+WORKDIR /opt/envs/sirius-host
+RUN --mount=type=cache,id=sirius-host,target=/root/.cache pixi install --frozen
+RUN --mount=type=cache,id=sirius-host,target=/root/.cache \
+    pixi run --frozen bash -c "export CUDAARCHS='${SIRIUS_CUDAARCHS}'; CMAKE_BUILD_PARALLEL_LEVEL=\$(nproc) make" \
+ && test -x build/release/duckdb
+RUN E=/opt/envs/sirius-host/.pixi/envs/default \
+ && mkdir -p /opt/sirius-rt/targets/x86_64-linux \
+ && cp -a "$E/lib" /opt/sirius-rt/lib \
+ && rm -rf /opt/sirius-rt/lib/rustlib /opt/sirius-rt/lib/python3* \
+ && find /opt/sirius-rt/lib -name '*.a' -delete \
+ && cp -a "$E/targets/x86_64-linux/lib" /opt/sirius-rt/targets/x86_64-linux/lib
+
 # ------------------------------------------------------------------ final
 FROM base AS final
 ARG RAPIDS_JAR_NAME
@@ -130,6 +155,9 @@ COPY --from=rapids-jar /opt/envs/jars /opt/envs/jars
 COPY --from=sirius-build /opt/sirius-rt/lib /opt/envs/sirius/.pixi/envs/default/lib
 COPY --from=sirius-build /opt/sirius-rt/targets /opt/envs/sirius/.pixi/envs/default/targets
 COPY --from=sirius-build /opt/envs/sirius/build/release/duckdb /opt/envs/sirius/build/release/duckdb
+COPY --from=sirius-host-build /opt/sirius-rt/lib /opt/envs/sirius-host/.pixi/envs/default/lib
+COPY --from=sirius-host-build /opt/sirius-rt/targets /opt/envs/sirius-host/.pixi/envs/default/targets
+COPY --from=sirius-host-build /opt/envs/sirius-host/build/release/duckdb /opt/envs/sirius-host/build/release/duckdb
 COPY versions.env docker/py.lock docker/polars.lock datagen/ndsgen/Cargo.lock /opt/envs/pins/
 ENV PY=/opt/envs/py/bin/python \
     POLARS_PY=/opt/envs/polars/bin/python \
@@ -138,5 +166,7 @@ ENV PY=/opt/envs/py/bin/python \
     RAPIDS_JAR=/opt/envs/jars/${RAPIDS_JAR_NAME} \
     SIRIUS_DUCKDB=/opt/envs/sirius/build/release/duckdb \
     SIRIUS_ENVLIB=/opt/envs/sirius/.pixi/envs/default/lib \
+    SIRIUS_HOST_DUCKDB=/opt/envs/sirius-host/build/release/duckdb \
+    SIRIUS_HOST_ENVLIB=/opt/envs/sirius-host/.pixi/envs/default/lib \
     NDSGEN=/opt/envs/ndsgen/ndsgen \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility

@@ -1,4 +1,4 @@
-# TQP-Vortex test suites
+# PageFlow test suites
 
 `tests/` is the correctness suite: pytest unit tests per component, the SF1
 smoke (all 22 queries against `tests/verification/`) and the e2e ladder (the
@@ -62,7 +62,7 @@ python main.py --smoke
 
 `tests/verification/SF1_reference.out` holds DuckDB's answers to the 22 queries
 on the standard SF1 data, every row, rendered as `main.py` writes
-`results.out`: per query, pandas `to_string()` of the result under TQP-Vortex's
+`results.out`: per query, pandas `to_string()` of the result under PageFlow's
 column names and in its column order, integers as integers and every other
 number to six decimals. The smoke suite compares with it at 10 significant
 figures and the e2e ladder at 6 (integers exactly), through
@@ -75,6 +75,6 @@ baselines' image) ran the baselines' query stream,
 `stream.py`'s `queries(1)` (so q11's FRACTION is 0.0001), over views on
 `$DATA_DIR/sf1/parquet`. DECIMAL values
 were written exactly, DOUBLE values rounded to six decimals. Each column's name,
-position and kind (integer or not) came from TQP-Vortex's own `results.out` on
+position and kind (integer or not) came from PageFlow's own `results.out` on
 the same data. Make it again the same way when the data or a query changes. The
 file holds nothing but the results: any other line would count as a result.

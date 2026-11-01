@@ -25,6 +25,8 @@ sha="$(sha1sum "${RAPIDS_JAR}" | cut -c1-40)"
 [ "${sha}" = "$(pin RAPIDS_JAR_SHA1)" ] && ok rapids "$(basename "${RAPIDS_JAR}")" || bad rapids "jar sha1 ${sha}"
 sv="$(SIRIUS_DISABLE=1 "${SIRIUS_DUCKDB}" -noheader -list -c 'select version()' 2>/dev/null | grep -v -e mbind -e '^$' | tail -1)"
 [ -n "${sv}" ] && ok sirius "duckdb ${sv}, sirius $(pin SIRIUS_REF | cut -c1-8)" || bad sirius "binary does not start"
+sv="$(SIRIUS_DISABLE=1 LD_LIBRARY_PATH="${SIRIUS_HOST_ENVLIB}" "${SIRIUS_HOST_DUCKDB}" -noheader -list -c 'select version()' 2>/dev/null | grep -v -e mbind -e '^$' | tail -1)"
+[ -n "${sv}" ] && ok sirius_host "duckdb ${sv}, sirius $(pin SIRIUS_HOST_REF | cut -c1-8)" || bad sirius_host "binary does not start"
 nv="$("${NDSGEN}" --version 2>/dev/null)"
 [ -n "${nv}" ] && ok ndsgen "${nv}" || bad ndsgen "missing (${NDSGEN})"
 

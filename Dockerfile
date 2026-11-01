@@ -86,6 +86,11 @@ RUN if [ "${WITH_NSYS}" = "1" ]; then \
       rm -rf /var/lib/apt/lists/* ; \
     fi
 
+# Linux Biolinum, the font the paper's figures are drawn in
+# (experiments/paper_scripts/figures/sigmod_style.py).
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-linuxlibertine \
+ && rm -rf /var/lib/apt/lists/*
+
 # ──────────────────────────────────────────────────────────────────────────
 # deps — Python requirements only, so source edits do not re-resolve pip.
 #        They bring cuDF (pylibcudf, RMM) and with it the one nvCOMP of the
@@ -139,6 +144,12 @@ FROM builder AS engine
 # host source over /opt/TQP-Vortex, which shadows TQPlib/*/*.so (gitignored, so
 # absent on the host); the entrypoint restores them from here.
 RUN mkdir -p /opt/tqp-artifacts && cp -a TQPlib /opt/tqp-artifacts/
+
+# The commit the image was built from (`make build` passes it; +dirty when the
+# tree differed from it), which the experiment drivers record under
+# `make experiments`, where there is no .git.
+ARG TQP_COMMIT=unknown
+ENV TQP_IMAGE_COMMIT=${TQP_COMMIT}
 
 ENV TQP_TABLES_PATH=/data/tables \
     TQP_OUT_DIR=/opt/TQP-Vortex/out \

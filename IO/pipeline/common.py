@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 from math import gcd
 import torch
 import constants
@@ -72,6 +73,49 @@ def col_to_gpu(ccr: CombinedColumnRep) -> torch.Tensor:
     in_stage.decompress()
     torch.cuda.synchronize()
     return in_stage.gpu_col.data()
+
+
+def decode_windows_off() -> bool:
+    """``TQP_NO_DECODE_WINDOWS=1``: the gather's index is decoded whole
+    (``col_to_gpu``), never window by window (``col_to_gpu_windowed``).
+    The sort's payload windows (``operators.sort``) are not affected."""
+    return (os.environ.get("TQP_NO_DECODE_WINDOWS") or "") not in ("", "0")
+
+
+def col_to_gpu_windowed(ccr: CombinedColumnRep) -> torch.Tensor:
+    """The whole column on the GPU, as ``col_to_gpu`` gives it, but a
+    compressed column larger than the chunk budget is read and decoded a
+    window of whole records at a time (``get_sliced_rep``, then
+    ``col_to_gpu``), each window copied into its rows of the one output
+    buffer and freed before the next.  ``col_to_gpu`` holds the whole
+    compressed column (its agg_buf) beside the whole decoded one (its
+    shared output), both contiguous; this holds the decoded column and one
+    window.  A RAW column, or one within the budget, is ``col_to_gpu``'s
+    (a RAW read is a single buffer anyway)."""
+    from adaptive.sizing_controller import window_rows
+    from IO.codec.region_producer import record_rows
+    rep = find_rep_by_algorithm(ccr, get_fixed_compression())
+    n = ccr.col_length()
+    row_b = max(1, rep.col_width() * rep.orig_elem_size())
+    chunk_b = constants.get_chunk_size_b()
+    if (decode_windows_off() or not rep.is_compressed or n * row_b <= chunk_b
+            or not getattr(rep, "table_backed", False)):
+        return col_to_gpu(ccr)
+    w = window_rows(chunk_b, row_b, record_rows(row_b))
+    # The output first, before any window's buffers: the one large
+    # contiguous allocation takes (or lends next to) the run at the cache
+    # region's boundary while nothing of this read sits there.  Its shape
+    # is col_to_gpu's: rows, or rows x width.
+    table = rep.record_table()
+    width = int(table.width)
+    out = torch.empty((n,) if width == 1 else (n, width),
+                      dtype=table.stored_dtype, device="cuda")
+    for lo in range(0, n, w):
+        part = col_to_gpu(ccr.get_sliced_rep(slice(lo, min(lo + w, n))))
+        out[lo:lo + part.shape[0]].copy_(
+            part.reshape((-1,) + tuple(out.shape[1:])))
+        del part
+    return out
 
 
 class _WindowPeakTracker:

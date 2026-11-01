@@ -1,107 +1,77 @@
 #!/usr/bin/env python3
-"""fig_regret — what one codec per (type, sortedness) costs against the
-per-column best, in measured round-trip time.
+"""fig_regret -- what one codec per (type, sortedness) costs against the
+per-column best, in measured round-trip time; one ACM column wide.
 
-Per class (type x run) three bars: the per-column best codec's time (each
-column at its own cheapest of the seven codecs), the extra time the SHIPPED
-codec spends on top of that, and the no-compression time (the measured raw
-D2H + H2D).  Everything is read from the sweep's outputs; nothing is fitted
-or re-derived here:
+    python3 make_regret_fig.py [--results DIR] [--out PDF]
+    -> experiments/paper_scripts/results/fig_regret.pdf
+
+Per class (type x run) one bar, as a share of the no-compression round trip
+(100%, a dashed line): the per-column best codec's time (each column at its
+own cheapest of the seven codecs), and the extra time the SHIPPED codec spends
+on top of that, labelled as the shipped codec's time over the best, as a ratio.
+The shipped codec is named in bold beside the class.  Everything is read from the sweep's outputs; nothing is fitted or
+re-derived here:
 
   profiling/results/sweep_per_column.csv   only rows with selected = 1, i.e.
                                            every codec at its shipped chunk
   profiling/results/codec_map.json         only "codec" (the shipped map)
 
 Costs are ``profiling/objective.py``'s sum of the four measured legs; classes
-are byte-weighted by scan frequency x raw bytes, like the sweep.  Styled to
-match make_ablation_figs.py: the same serif stack, ink/grid neutrals,
-validated categorical slots, bare() spines, legend above the axes, and
-pdf+png at 300 dpi.  No title -- the caption carries it.
+are byte-weighted by scan frequency x raw bytes, like the sweep.  Every bar
+is labelled with the ratio; an extra under 0.05 ms/GB (noise) reads 1.0x.
 
-    make experiments SCRIPT=experiments/paper_scripts/figures/make_regret_fig.py
-    -> experiments/paper_scripts/figures/plot/fig_regret.{pdf,png}
+NO COMPRESSION IS ONE RATE.  A raw round trip moves the same bytes whatever
+the type or run, so every class gets the same no-compression time: the
+measured raw D2H + H2D pooled over every column and both runs, weighted like
+the classes.  Per class it would only show measurement noise (the raw H2D of
+one column differs by up to 4 ms/GB between its sorted and unsorted runs).
+So it is the axis's unit: every bar is divided by it.
+
+Style: sigmod_style.py (upright Linux Biolinum, 9 pt, the page one column wide).
 """
 from __future__ import annotations
 
+import argparse
 import csv
 import json
 import os
 import sys
 from collections import defaultdict
 
-import matplotlib
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
+from sigmod_style import COLUMN, SYSTEMS, save
 
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 sys.path.insert(0, REPO)
 from profiling.objective import cost_s, raw_cost_s   # noqa: E402
 
 RESULTS = os.path.join(REPO, "profiling", "results")
-PLOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "plot")
+OUT = os.path.join(os.path.dirname(HERE), "results", "fig_regret.pdf")
 RUNS = ["unsorted", "sorted"]
 TYPES = ["int", "float", "date", "string"]
 GB = 1024 ** 3
 
-# ---------------------------------------------------------------- style
-INK, INK2, INK3 = "#0b0b0b", "#52514e", "#78776f"
-GRID, AXIS = "#e2e1dc", "#c9c8c2"
-BASE = "#77766f"                                    # baseline / "none" role
-S1, S2, S3 = "#2a78d6", "#eb6834", "#1baf7a"        # validated categorical slots
-TRACK = "#dfddd6"                                   # the un-compressed budget
-
-CODEC_INSET = 6.0       # pt, codec column's right edge to the axis
-COL_GAP = 14.0          # pt, clear space between the codec and class columns
-FS = 20                 # figure-wide font size
-
-plt.rcParams.update({
-    "font.family": "serif",
-    "font.serif": ["DejaVu Serif"],
-    "font.size": FS,
-    "axes.labelsize": FS,
-    "axes.titlesize": FS,
-    "xtick.labelsize": FS,
-    "ytick.labelsize": FS,
-    "legend.fontsize": FS,
-    "figure.facecolor": "white",
-    "axes.facecolor": "white",
-    "axes.edgecolor": AXIS,
-    "axes.labelcolor": INK2,
-    "text.color": INK,
-    "xtick.color": INK2,
-    "ytick.color": INK2,
-    "axes.linewidth": 0.9,
-    "grid.color": GRID,
-    "grid.linewidth": 0.8,
-    "pdf.fonttype": 42,
-    "ps.fonttype": 42,
-    "savefig.bbox": "tight",
-    "savefig.pad_inches": 0.02,
-})
-
-
-def save(fig, stem):
-    for ext in ("pdf", "png"):
-        fig.savefig(f"{stem}.{ext}", dpi=300)
-    plt.close(fig)
-
-
-def bare(ax):
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.set_axisbelow(True)
-    ax.xaxis.grid(True)                             # value axis is x here
-    ax.yaxis.grid(False)
+# Bar parts: the best in PageFlow's blue, the rule's extra a darker blue; two
+# lightnesses, so greyscale holds.  No compression is the dashed 100% line.
+EDGE = dict(edgecolor="black", linewidth=0.5)
+BEST = dict(facecolor=SYSTEMS["PageFlow"][0], **EDGE)
+EXTRA = dict(facecolor="#123f78", **EDGE)
+RAW_LINE = dict(color="black", lw=0.8, ls=(0, (3, 2)))
+CODEC_INSET = 3.0       # pt, codec column's right edge to the axis
+COL_GAP = 6.0           # pt, clear space between the codec and class columns
+TYPE_GAP = 0.35         # rows of extra space between two types
 
 
 # ---------------------------------------------------------------- data
-def build():
-    with open(os.path.join(RESULTS, "codec_map.json"), encoding="utf-8") as f:
+def build(results):
+    with open(os.path.join(results, "codec_map.json"), encoding="utf-8") as f:
         shipped = json.load(f)["codec"]
     # cols[(type, run)][(table, column)] = {"w", "raw", "raw_s", codec: cost_s}
     cols = defaultdict(dict)
-    with open(os.path.join(RESULTS, "sweep_per_column.csv"), encoding="utf-8") as f:
+    with open(os.path.join(results, "sweep_per_column.csv"), encoding="utf-8") as f:
         for r in csv.DictReader(f):
             if r["selected"] != "1":
                 continue
@@ -109,6 +79,11 @@ def build():
                 "w": int(r["scan_freq"]), "raw": int(r["raw_bytes"]),
                 "raw_s": raw_cost_s(r), "cand": {}})
             e["cand"][r["codec"]] = cost_s(r)
+
+    # The no-compression rate, pooled over every class (see the docstring).
+    pool = [e for c in cols.values() for e in c.values()]
+    t_r = (sum(e["w"] * e["raw_s"] for e in pool)
+           / sum(e["w"] * e["raw"] for e in pool))
 
     bars = []
     for ttype in TYPES:
@@ -119,9 +94,8 @@ def build():
             codec = shipped[ttype][run]
             den = sum(e["w"] * e["raw"] for e in items)
             t_o = sum(e["w"] * min(e["cand"].values()) for e in items) / den
-            t_p = sum(e["w"] * (e["raw_s"] if codec == "RAW" else e["cand"][codec])
-                      for e in items) / den
-            t_r = sum(e["w"] * e["raw_s"] for e in items) / den
+            t_p = t_r if codec == "RAW" else \
+                sum(e["w"] * e["cand"][codec] for e in items) / den
             bars.append((f"{ttype}, {run}", t_o * GB * 1e3, t_p * GB * 1e3,
                          t_r * GB * 1e3, codec))
     return bars
@@ -129,67 +103,70 @@ def build():
 
 # ---------------------------------------------------------------- figure
 def main():
-    bars = build()
-    raw_ms = max(b[3] for b in bars)
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--results", default=RESULTS,
+                    help="a `make profiling` output dir (codec_map.json, sweep_per_column.csv)")
+    ap.add_argument("--out", default=OUT)
+    args = ap.parse_args()
 
-    fig, ax = plt.subplots(figsize=(11.6, 4.9))
-    ypos, labels = [], []
-    y = 0.0
+    bars = build(args.results)
     for label, t_o, t_p, t_r, codec in bars:
-        ax.barh(y, t_r, height=0.62, color=TRACK, linewidth=0, zorder=1)
-        ax.barh(y, t_o, height=0.62, color=S1, edgecolor="white", linewidth=0.7,
-                zorder=2)
-        if t_p > t_o:
-            ax.barh(y, t_p - t_o, height=0.62, left=t_o, color=S2, linewidth=0,
-                    zorder=3)
-        # Annotate the excess only where it reaches 0.05 ms/GB; below that it
-        # rounds to nothing and "+0.0" is noise.
-        excess, pct = t_p - t_o, 100 * (t_p / t_o - 1)
-        txt = f"{t_p:.1f}"
-        if excess >= 0.05:
-            txt += f"   +{excess:.1f} ({pct:.1f}%)" if pct < 10 else \
-                   f"   +{excess:.1f} ({pct:.0f}%)"
-        ax.annotate(txt, (max(t_p, t_o) + 1.2, y), va="center", fontsize=FS,
-                    color=INK if excess >= 0.05 else INK2)
-        ypos.append(y)
-        labels.append((label, codec))
-        y -= 1.0
+        print(f"  {label:<17} {codec:<9} best {t_o:6.2f}  rule {t_p:6.2f} "
+              f"(+{100 * (t_p / t_o - 1):4.1f}%)  raw {t_r:6.2f} ms/GB")
 
-    ax.axvline(raw_ms, color=BASE, ls="--", lw=0.9, zorder=4)
-    # The row label is two columns, not one string: the CLASS is the row's name
-    # and the CODEC is the finding -- which codec one rule per class picks -- so
-    # the codec carries bold primary ink and the class stays secondary.
-    # Deliberately NOT coloured: S1 blue is already the oracle series here.
-    # Offsets are in POINTS, so the two columns keep their gap regardless of how
-    # wide the axes end up.
+    fig, ax = plt.subplots(figsize=(COLUMN, 2.3), layout="constrained")
+    h = 0.66
+    ypos, y, prev = [], 0.0, None
+    for label, t_o, t_p, t_r, codec in bars:
+        ttype = label.split(",")[0]
+        if prev is not None and ttype != prev:
+            y -= TYPE_GAP
+        prev = ttype
+        best, rule = 100 * t_o / t_r, 100 * t_p / t_r
+        ax.barh(y, best, height=h, zorder=2, **BEST)
+        if rule > best:
+            ax.barh(y, rule - best, height=h, left=best, zorder=3, **EXTRA)
+        # An extra under 0.05 ms/GB is noise: the rule picked the best, 1.0x.
+        ratio = f"{t_p / t_o:.2f}×" if t_p - t_o >= 0.05 else "1.0×"
+        # Beside the bar's end; inside it, in white, for a bar that would
+        # carry it into the 100% line.
+        inside = rule > 80
+        ax.annotate(ratio, (rule, y), xytext=(-2 if inside else 2, 0),
+                    textcoords="offset points", va="center", zorder=4,
+                    ha="right" if inside else "left",
+                    color="white" if inside else "black")
+        ypos.append(y)
+        y -= 1.0
+    # No compression: the unit, one line (named in the legend).
+    ax.axvline(100, zorder=4, **RAW_LINE)
+
+    # Two label columns: the class, and the codec the rule ships for it in bold
+    # (the finding).  Offsets are in points, so the gap holds at any axes width.
     ax.set_yticks(ypos)
-    ax.set_yticklabels([c for c, _ in labels])
-    drawn = [ax.annotate(codec, xy=(0, yy), xycoords=("axes fraction", "data"),
+    ax.set_yticklabels([b[0] for b in bars])
+    drawn = [ax.annotate(b[4], xy=(0, yy), xycoords=("axes fraction", "data"),
                          xytext=(-CODEC_INSET, 0), textcoords="offset points",
-                         ha="right", va="center", fontweight="bold", color=INK)
-             for (_, codec), yy in zip(labels, ypos)]
-    # MEASURE the codec column rather than estimating it from a per-character
-    # guess: bold metrics are not a fixed multiple of the font size.
+                         ha="right", va="center", fontweight="bold")
+             for b, yy in zip(bars, ypos)]
     fig.canvas.draw()
     r = fig.canvas.get_renderer()
     widest = max(t.get_window_extent(renderer=r).width for t in drawn)
     ax.tick_params(axis="y", length=0,
                    pad=widest * 72.0 / fig.dpi + CODEC_INSET + COL_GAP)
 
-    ax.set_xlim(0, raw_ms * 1.015)
-    ax.set_ylim(y + 0.35, 0.65)
-    ax.set_xlabel("round-trip time per GB (ms)")
-    bare(ax)
+    ax.set_xlim(0, 104)
+    ax.set_xticks([0, 25, 50, 75, 100])
+    ax.set_ylim(y + 1 - h / 2 - 0.25, h / 2 + 0.25)
+    ax.set_xlabel("Time (% of no compression)")
+    ax.grid(axis="y", visible=False)
+    ax.grid(axis="x", visible=True)
 
-    ax.legend(handles=[Patch(facecolor=c, linewidth=0, label=l) for c, l in
-                       ((S1, "Per-Column Best"),
-                        (S2, "Extra Time Spent by Our Rule"),
-                        (TRACK, "No Compression"))],
-              ncol=3, frameon=False, loc="upper center", bbox_to_anchor=(0.5, 1.13),
-              handlelength=1.2, columnspacing=1.6)
-
-    os.makedirs(PLOT_DIR, exist_ok=True)
-    save(fig, os.path.join(PLOT_DIR, "fig_regret"))
+    fig.legend(handles=[Patch(label=l, **st) for st, l in
+                        ((BEST, "Per-column best"), (EXTRA, "Extra by our rule"))]
+               + [Line2D([], [], label="No compression", **RAW_LINE)],
+               ncol=3, loc="outside upper center", handlelength=1.0,
+               handletextpad=0.4, columnspacing=0.9)
+    save(fig, args.out)
 
 
 if __name__ == "__main__":

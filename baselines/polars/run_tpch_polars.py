@@ -49,11 +49,23 @@ def build_engine():
     through the patched DataFrameScan (device_cache.py), and no CPU fallback.
     Its memory resource is given explicitly: left unset, the in-memory executor
     allocates from a managed (UVM) pool, which pages the "resident" columns out
-    to host memory instead of failing once the working set exceeds the GPU."""
+    to host memory instead of failing once the working set exceeds the GPU.
+    POLARS_RESIDENT_MR=managed_pool opts into exactly that, pooled and with
+    prefetch: a query whose working set exceeds the GPU then completes, paging
+    to host memory inside the timed run, instead of failing out of memory."""
     if RESIDENT:
         import rmm
+        kind = os.environ.get("POLARS_RESIDENT_MR", "async")
+        if kind == "async":
+            mr = rmm.mr.CudaAsyncMemoryResource()
+        elif kind == "managed_pool":
+            mr = rmm.mr.PrefetchResourceAdaptor(
+                rmm.mr.PoolMemoryResource(rmm.mr.ManagedMemoryResource()))
+        else:
+            sys.exit(f"POLARS_RESIDENT_MR={kind!r}: expected async or managed_pool")
+        print(f"resident memory resource: {kind}")
         return pl.GPUEngine(device=0, executor="in-memory", raise_on_fail=True,
-                            memory_resource=rmm.mr.CudaAsyncMemoryResource())
+                            memory_resource=mr)
     part_mb = int(os.environ.get("GPU_PART_MB", "256"))
     return spill_stats.build_engine(part_mb, os.environ.get("GPU_MR", "async"))
 
@@ -234,6 +246,9 @@ def run_passes(engine, INPUT, OUT_CSV, SUBSET, APPEND, warm_dir, query):
         else:
             msg = str(err).splitlines()[0][:90].replace(",", ";")
             print(f"{name:10} {'FAIL':8} {dt:9.2f}   {msg}")
+            # The whole error, for the query's log: the row keeps only its
+            # first line, and a MemoryError's cause comes after it.
+            print(err)
             f.write(f"{name},FAIL,{dt:.3f},{msg}\n")
         f.flush()
     f.close()

@@ -5,16 +5,13 @@ A perf-report directory (``main.py --perf_report <dir>``) holds one
 file, section, kind or field raises instead of reading as 0, so a renamed key
 fails loudly rather than turning into a silent zero.
 
-What the experiments read, and nothing else:
-
-* ``wall.approx_time``, always written (the same number as
-  ``query_times.csv``);
-* under ``TQP_EXPERIMENT_TELEMETRY=1``: the ``movement`` section (the
-  movement ledger, ``IO/telemetry/movement.py``: per query and kind, the
-  ``pages``, ``logical_b`` and ``wire_b`` moved; ``kinds`` without the
-  output step, ``output`` the output step's), ``residency``
-  (``IO/telemetry/residency.py``), ``sizing_model``, ``compression`` and
-  each pipe's ``peak_gpu_bytes``.
+What the experiments read, and nothing else (a query's time they take from
+``query_results.csv``, beside the reports), all under
+``TQP_EXPERIMENT_TELEMETRY=1``: the ``movement`` section (the movement
+ledger, ``IO/telemetry/movement.py``: per query and kind, the ``pages``,
+``logical_b`` and ``wire_b`` moved; ``kinds`` without the output step,
+``output`` the output step's), ``residency`` (``IO/telemetry/residency.py``),
+``sizing_model``, ``compression`` and each pipe's ``peak_gpu_bytes``.
 
 A script that reads the ledger loads with ``movement=True``, which raises
 :class:`PerfDataMissing` for a report written without the switch.
@@ -35,8 +32,6 @@ KINDS = ("scan_h2d", "scan_uva",
          "cache_hit", "resident_d2d",
          "cache_fill", "avoided_dead", "avoided_clean",
          "result_d2h")
-SPILL_KINDS = ("spill_bypass", "spill_rejected", "spill_evict",
-               "spill_mirror")
 # Where a pipe's output pages go (each output page is born exactly once).
 OUT_KINDS = ("cache_fill", "spill_bypass", "spill_rejected")
 # Kinds the ledger gained after reports were first written (2026-10-10): a
@@ -81,11 +76,6 @@ def load(perf_dir: str, sf: int, q: int, *, movement: bool = False) -> dict:
     return perf
 
 
-def approx_time(perf: dict) -> float:
-    """The canonical query time, ``wall.approx_time`` (seconds)."""
-    return float(perf["wall"]["approx_time"])
-
-
 def peak_gpu_bytes(perf: dict) -> int:
     """The query's high-water mark in the arena's operator space: the
     largest per-pipe ``totals.peak_gpu_bytes``.  The cache region is not in
@@ -128,7 +118,3 @@ def born(perf: dict, field: str = "logical_b") -> int:
     """Intermediate pages produced: :data:`OUT_KINDS`."""
     return mv_sum(perf, OUT_KINDS, field)
 
-
-def spill_total(perf: dict, field: str = "wire_b") -> int:
-    """Every spill kind: all intermediate bytes written D2H."""
-    return mv_sum(perf, SPILL_KINDS, field)

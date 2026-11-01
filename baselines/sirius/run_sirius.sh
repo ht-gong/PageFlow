@@ -19,7 +19,8 @@
 # $SPILL_STATS_DIR/q<N>/ and spill_stats.py appends its record to
 # $SPILL_STATS_DIR/records.jsonl, kills and timeouts included. LOAD_MODE=resident
 # + ENGINE_KEY=sirius_resident (run.sh sets both) pin the query's columns on the
-# GPU before each pass (run_tpch_sirius.py, AGENTS.md).
+# GPU before each pass (run_tpch_sirius.py, AGENTS.md); with SIRIUS_PIN_TIER=host
+# (sirius_host) in Sirius's pinned host tier instead.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

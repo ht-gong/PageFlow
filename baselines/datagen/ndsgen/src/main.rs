@@ -43,7 +43,7 @@ use arrow::datatypes::{
 use clap::Parser;
 use parquet::arrow::arrow_writer::{ArrowWriter, ArrowWriterOptions};
 use parquet::basic::{Compression, Encoding, ZstdLevel};
-use parquet::file::properties::{WriterProperties, WriterVersion};
+use parquet::file::properties::{EnabledStatistics, WriterProperties, WriterVersion};
 use parquet::schema::types::ColumnPath;
 use rayon::prelude::*;
 use tpchgen::generators::{
@@ -473,9 +473,18 @@ fn writer_props(table: &str, batch: &RecordBatch, fmts: &Formats) -> WriterPrope
         b = b.set_column_compression(path.clone(), c.codec);
         b = match c.enc {
             Enc::Plain => b.set_column_dictionary_enabled(path.clone(), false).set_column_encoding(path, Encoding::PLAIN),
-            Enc::Delta => b
-                .set_column_dictionary_enabled(path.clone(), false)
-                .set_column_encoding(path, delta_encoding(f.data_type())),
+            Enc::Delta => {
+                // No column index (page min/max) on DELTA_BYTE_ARRAY columns: with one,
+                // cudf's reader (cudf-Polars 26.06) decodes them wrong; chunk stats stay
+                let b = match f.data_type() {
+                    DataType::Utf8 | DataType::Binary => {
+                        b.set_column_statistics_enabled(path.clone(), EnabledStatistics::Chunk)
+                    }
+                    _ => b,
+                };
+                b.set_column_dictionary_enabled(path.clone(), false)
+                    .set_column_encoding(path, delta_encoding(f.data_type()))
+            }
             Enc::Dict => {
                 let keep = mr_keeps_dictionary(batch.column(i));
                 // v1 dictionary columns fall back to PLAIN, as parquet-mr's v1 writer does

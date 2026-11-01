@@ -28,7 +28,8 @@ The two pieces fit together like this:
    payload (`inst.ccr`). **Every gather is a node whose inputs carry a
    role**: its *sources* (every input but the last, read over UVA or
    streamed onto the GPU, and freed by the gather) and its *index* (the last
-   input, read through `col_to_gpu`). A join's per-side `rearrange` gathers
+   input, read through `col_to_gpu_windowed`: a compressed index over the
+   chunk budget is decoded a window at a time). A join's per-side `rearrange` gathers
    the side's payload (`materialize_now` minus the keys) by the core's
    `out_index`; a deferred column instead rides a row lineage across its
    join chain — the seed join's `out_index`, then one `compose` node per
@@ -73,8 +74,7 @@ column, one seed per lineage, the roles),
 `--compression_search fixed` (a JSON of per-tag codecs applied through the
 applier instead of a search) is covered by `test_fixed_search_json.py` with
 `tests/verification/SF1_fixed_search.json` as the checked-in example. Design
-background is in `adaptive/README.md` (the decision menu the applier feeds)
-and `docs/materialization_unification_plan.md`.
+background is in `adaptive/README.md` (the decision menu the applier feeds).
 
 To inspect a graph, dump it (local only; never check the output in):
 

@@ -6,8 +6,8 @@ Its contract is ``baselines/AGENTS.md`` ("Spill pass"): one row per
 ``baselines/spill_results.py``, whose ``FIELDS``, ``KINDS``, ``COMMON_KINDS``,
 ``QUALITY``, ``RUN_STATUS`` and ``headline()`` are imported here,
 so the file is checked against the writer's own definitions rather than a
-copy of them.  Figures aggregate by category (``category()``) or take the
-headline sums (``headlines()``), never a kind by name.
+copy of them.  Figures take the headline sums (``headlines()``), never a
+kind by name.
 
 Read strictly, so a change on either side fails loudly instead of turning into
 a gap in a figure: a header other than ``FIELDS``, an engine without ``KINDS``,
@@ -28,7 +28,7 @@ from common import QUERIES, ROOT
 
 sys.path.insert(0, os.path.join(ROOT, "baselines"))
 from spill_results import (COMMON_KINDS, FIELDS, KINDS, QUALITY, RUN_STATUS,  # noqa: E402
-                           category, headline)
+                           headline)
 
 PATH = os.path.join(ROOT, "baselines", "results", "spill_profile.csv")
 _NUM = ("logical_b", "wire_b", "count", "seconds")
@@ -95,15 +95,3 @@ def headlines(cells) -> dict[tuple[str, int], dict[int, dict]]:
                              for q, c in queries.items()}
     return out
 
-
-def by_category(engine: str, cell: dict) -> dict[str, float]:
-    """A query's logical bytes per category (peaks: the largest), without
-    ``context``, whose kinds do not add up; unmeasured rows count
-    nothing, so check each row's quality where it matters."""
-    out: dict[str, float] = {}
-    for kind, row in cell["rows"].items():
-        cat, v = category(engine, kind), row["logical_b"]
-        if v is None or cat == "context":
-            continue
-        out[cat] = max(out.get(cat, 0.0), v) if cat.startswith("peak_") else out.get(cat, 0.0) + v
-    return out

@@ -21,7 +21,7 @@ Consumers:
 - `rearrange_pipeline`: `operators/hashjoin.py` (join rearranges and lineage
   composes) and `main.py` (`_materialize_deferred`, the deferred gathers).
 - `col_to_gpu`: `operators/sort.py`, `operators/output.py` and
-  `rearrange_pipeline` itself.
+  `col_to_gpu_windowed`, which `rearrange_pipeline` reads its index through.
 
 `IO/README.md` ("One tick, end to end") walks through one steady-state tick.
 This file covers what that walkthrough skips: how a pipeline is built, the
@@ -461,7 +461,7 @@ build_ahead=k + 3)` at the end of tick *i*:
 | `tick_cutter.py` | The tick cutter: `common_bounds`, `quantum_points`, `cut` (whole quanta up to the budget, or `cut_rows`), `pack` (the greedy packing, shared with the join core's buckets) and `slice_column` (each tick's slices, whole records where both ends are record boundaries). |
 | `vortex_pipeline.py` | `OutputLayout` and `VortexPipeline`. Covers construction, codec resolution and slot facts; chunking (through the tick cutter) and the pre-built `TickStages`; static column decisions; `do_exchange` and the region producer's pack and drain (`result_tables`); the menu, `_emit_tick`, `_jit_rebuild`, `_actuate_write_picks`, the tick sizing session's samples and `_resection`; and `get_result` / `_publish_outputs`. |
 | `rearrange_pipeline.py` | `rearrange_pipeline(node, cpu_mem_pool, type, *, applier, page_cache)`; `_read_plan` (UVA or streamed, by `uva_bytes` against the streamed rep's stored bytes and `_fits_on_gpu`), `_stream_in` and `_raw_home` (the tick pipes that load a source onto the GPU or decode it home RAW), and `_stream_gather`: the windowed gather, compress and copy-home loop (regions), with the SZ-B sizing hooks. `_ARGSORT_OVERHEAD_PER_ROW = 24`. |
-| `common.py` | `_WindowPeakTracker`, `col_to_gpu` and `PartitionedTensor`. |
+| `common.py` | `_WindowPeakTracker`, `col_to_gpu`, `col_to_gpu_windowed` and `PartitionedTensor`. |
 
 ## Environment variables
 

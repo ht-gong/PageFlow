@@ -14,8 +14,8 @@ still sit behind a switch, e.g. a module global ``NEW_PATH`` in
 
 Times are ``query_times.csv`` rows (AGENTS.md, "TIMING"); every telemetry
 switch stays off.  Prints per query and arm the median over cycles, and for
-the suite and the plan's query groups A-E (``helpers/common.py``) the change
-against the base with a 95% paired-cycle bootstrap interval.
+the suite the change against the base with a 95% paired-cycle bootstrap
+interval.
 
     python3 experiments/self-verification/e2_speedup.py \\
         [--gpu 5] --arm ... --arm ... [--cycles 3] [-- <main.py flags>]
@@ -37,7 +37,7 @@ import switch_ab_analyze  # noqa: E402
 
 
 def summarise(out_dir: str) -> None:
-    res = switch_ab_analyze.analyse(out_dir, common.GROUPS)
+    res = switch_ab_analyze.analyse(out_dir)
     switch_ab_analyze.print_summary(out_dir, res)
     with open(os.path.join(out_dir, "summary.json"), "w") as f:
         json.dump(res, f, indent=1, default=str)

@@ -27,11 +27,11 @@ GPU's NUMA node only (its CPUs and memory; `NUMA=off` to unbind).
 | `make doctor` | check versions against the pins, that the GPU is idle and not exclusive-mode, that the container is bound to the GPU's NUMA node, that io_uring works, free space |
 | `make data SF=100` | generate `$DATA_DIR/sf100` if missing, then validate it |
 | `make validate SF=100` | validate `$DATA_DIR/sf100` |
-| `make bench SF=100 [ENGINES="…"]` | TPC-H q1–22 on the four baseline engines → `results/all_results.csv` (the TQP-Vortex root's `make bench` adds `tqp_vortex`) |
+| `make bench SF=100 [ENGINES="…"]` | TPC-H q1–22 on the four baseline engines → `results/all_results.csv` (the repository root's `make bench` adds `tqp_vortex`) |
 | `make smoke` | SF1, the four baseline engines, nothing merged (the root's `make smoke-all` adds `tqp_vortex`); prints a query × engine table, fails unless every query is OK with the SF1 reference row counts (`AGENTS.md`) |
 | `make ablation [SF=5 ENCODINGS=… COMPRESSIONS=… ROUNDS=3 ENGINES=… TOL=0.05 OUT=results]` | parquet-format profiling pass → `format_profile.csv` (times) + `format_map.json` (decision); prints the results table |
 | `make summary` | pivots of `results/all_results.csv`, and per SF the queries whose OK engines disagree on the row count |
-| `make spill SF=1000 [ENGINES=…]` | spill pass (`rapids`, `polars_gpu`, `sirius`) → `results/spill_profile.csv` + `spill_settings.json` (the TQP-Vortex root's `make spill` adds `tqp_vortex`) |
+| `make spill SF=1000 [ENGINES=…]` | spill pass (`rapids`, `polars_gpu`, `sirius`) → `results/spill_profile.csv` + `spill_settings.json` (the repository root's `make spill` adds `tqp_vortex`) |
 | `make spill-smoke` | SF1 under forced spill, nothing merged; fails unless every record and identity holds (the root's `make spill-smoke` adds `tqp_vortex`) |
 | `make spill-test` | the spill record builders' unit tests (CPU only) |
 
@@ -55,13 +55,14 @@ ramdisk copy, then frees the ramdisk. Each engine folds its 22 rows into
 | `polars_gpu` | cudf-polars 26.6 / Polars 1.39.3 (GPU) | `polars/` |
 | `duckdb_cpu` | DuckDB 1.5.5 (CPU) | `duckdb/` |
 | `sirius` | Sirius (GPU-native SQL, DuckDB 1.5.5 extension, libcudf 26.08) | `sirius/` |
-| `tqp_vortex` | TQP-Vortex (GPU), in its own image | `..`, the TQP-Vortex root |
+| `tqp_vortex` | PageFlow (GPU), in its own image | `..`, the repository root |
 | `sirius_resident` · `polars_gpu_resident` · `duckdb_cpu_resident` · `rapids_resident` | the same engines in resident mode: the query's data in GPU memory (DuckDB: native tables; RAPIDS, best effort: Spark's cache in host memory) before the timed run | as above |
+| `sirius_host` | the second Sirius build (`SIRIUS_HOST_REF`, July 2026), the query's columns pinned in its host tier before the timed run (`AGENTS.md`) | `sirius/` |
 
 Every baseline engine reads the ramdisk parquet in every query; none loads
 tables into memory first, except under the `*_resident` keys, which time
 execution alone (what each loads, and how it is checked: `AGENTS.md`).
-`tqp_vortex` reads the same parquet from disk; the TQP-Vortex root's `make
+`tqp_vortex` reads the same parquet from disk; the repository root's `make
 bench` runs it after the others, through
 `../bench/run_tqp.sh`. Every engine runs each query in its own process: an
 untimed warm pass of the same query on SF1, then one timed run on the target
@@ -74,12 +75,12 @@ generator `datagen/ndsgen` (TPC-H rows from tpchgen-rs, the dbgen 2.17.3 port,
 written in NVIDIA's NDS-H format; it replaced the dbgen → Spark 3.5.8 transcode,
 whose datasets hold the same rows). Before a benchmark each engine gets those
 rows in the per-column format its profiling map chose (`AGENTS.md`, "Before
-every benchmark"); TQP-Vortex converts columns into its own format and reads any
+every benchmark"); PageFlow converts columns into its own format and reads any
 of them. Never point a runner at self-written parquet (DuckDB's own `CALL dbgen` export, cudf exports);
 it is not comparable to the external standard. `make data` / `make bench`
 generate and validate; full rules and rationale in **`results/GENERATOR.md`**.
 
-The same data is TQP-Vortex's, which has no generator of its own: it scans
+The same data is PageFlow's, which has no generator of its own: it scans
 the parquet in `$DATA_DIR`, where it looks by default (`TQP_DATA_DIR`).
 
 ## Results — `results/all_results.csv`
@@ -90,11 +91,13 @@ files, below). One row per `(engine, scale_factor, query)`. Each runner writes a
 temp CSV and upserts its rows via `merge_results.py <engine> <sf> <run_csv>`,
 each replacing the row of the same `(engine, scale_factor, query)`;
 every other view (summary, matrices, per-engine scaling) is a pivot of this file
-(`make summary`). Do **not** add parallel summary CSVs; pivot this instead.
+(`make summary`). Do **not** add parallel summary CSVs; pivot this instead. The
+file stays on the box that ran the engines and is never committed (the
+repository root's AGENTS.md, "Results are never committed").
 
 | column | type | values / meaning |
 |--------|------|------------------|
-| `engine` | string | `rapids` · `polars_gpu` · `duckdb_cpu` · `sirius` · `tqp_vortex`; resident mode: `sirius_resident` · `polars_gpu_resident` · `duckdb_cpu_resident` · `rapids_resident` |
+| `engine` | string | `rapids` · `polars_gpu` · `duckdb_cpu` · `sirius` · `tqp_vortex`; resident mode: `sirius_resident` · `polars_gpu_resident` · `duckdb_cpu_resident` · `rapids_resident`; host-pinned: `sirius_host` |
 | `scale_factor` | int | TPC-H scale factor (≈ GB of raw data) |
 | `query` | string | `query1` … `query22` |
 | `status` | string | `OK` · `FAIL` (engine error; GPU out-of-memory shows here with the engine's message in `rows_or_error`, e.g. Sirius's "OOM retry limit") · `KILLED_DISK` (disk-watchdog kill) · `TIMEOUT` (per-query timeout) |
@@ -129,13 +132,13 @@ run moves off the GPU, by design and under memory pressure, per tier (host,
 disk), what it brings back and the peak it holds per tier. It runs the bench
 protocol with each engine's own instrumentation on: RAPIDS's Spark event log,
 rapidsmpf's statistics for cudf-polars, Sirius's quent telemetry and DEBUG log,
-and, from the TQP-Vortex root (`make spill`, `../bench/run_tqp.sh` with
-`SPILL=1`), TQP-Vortex's movement ledger and residency peaks.
+and, from the repository root (`make spill`, `../bench/run_tqp.sh` with
+`SPILL=1`), PageFlow's movement ledger and residency peaks.
 The pass's own times never reach `all_results.csv`. Output:
 `results/spill_profile.csv`, one row per (engine, SF, query, kind), and
 `results/spill_settings.json`; the raw evidence stays under
 `$SCRATCH/spill/sf<SF>/<engine>/`. Schema, kinds and categories in `AGENTS.md`
-and `spill_results.py`; the design in `../docs/engine_spill_plan.md`.
+and `spill_results.py`.
 
 ## Versions
 

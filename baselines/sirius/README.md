@@ -33,12 +33,20 @@ final image keeps only `build/release/duckdb` (extension statically linked and
 auto-loading) and the pixi env's shared libraries, at the path the binary's
 RPATH names: `$SIRIUS_DUCKDB` and `$SIRIUS_ENVLIB`.
 
+The `sirius-host-build` stage builds a second Sirius the same way, at
+`SIRIUS_HOST_REF` (572fc850, the July 2026 evaluation's build; libcudf
+26.06.01, CUDA 13.2), into `/opt/envs/sirius-host`: `$SIRIUS_HOST_DUCKDB` and
+`$SIRIUS_HOST_ENVLIB`. Only the `sirius_host` engine key runs it, with
+`sirius_host.yaml` and the query's columns pinned in the host tier
+(`baselines/AGENTS.md`).
+
 ## Layout
 
 ```
 env.sh               engine environment shared by the runner and the format probes:
                      config with the IO backend resolved, spill dir
 sirius.yaml          gpu_execution config: 1 GPU, 95% VRAM, 256Gi host tier, disk spill
+sirius_host.yaml     sirius.yaml with a 640Gi host tier, for sirius_host
 run_tpch_sirius.py   parses the shared query stream, runs each query through the Sirius
                      duckdb binary (transparent GPU): SF1 warm pass, one timed run, result rows
 run_sirius.sh        safe per-query driver: one duckdb process per query + disk watchdog
@@ -89,6 +97,9 @@ and engine logs go to `results/*.log` / `results/*_logs/` (gitignored).
   are pinned with `CALL pin_table('<dir>/<table>/*.parquet', tier='gpu', …)`,
   with CPU fallback off, and the timed run must be served by every pin (checked
   in the Sirius log, `AGENTS.md`).
+- **Host-pinned** (key `sirius_host`): resident mode on the second build, with
+  `tier='host'` (`SIRIUS_PIN_TIER=host`) and `sirius_host.yaml`, at any SF; the
+  paper figures' Sirius (`experiments/paper_scripts/e1_motivation.py`).
 
 ## Tuning knobs
 

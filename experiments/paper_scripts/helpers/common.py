@@ -1,10 +1,13 @@
 """What the experiment drivers (``paper_scripts/``, ``self-verification/``)
-share: the repository root, the study's main.py flags and query groups, and
-running a command in the ``dev`` container.
+share: the repository root, the data root and GPU defaults, the engine code's
+commit, and running a command in the ``dev`` container.
 
-The drivers run on the host.  Engine work runs in the ``dev`` service
-(``docker compose run``, the working tree mounted at ``/opt/TQP-Vortex``),
-pinned to one GPU and, when its NUMA node is found, to that node's CPUs.
+The self-verification drivers run on the host and their engine work in the
+``dev`` service (``docker compose run``, the working tree mounted at
+``/opt/TQP-Vortex``), pinned to one GPU and, when its NUMA node is found, to
+that node's CPUs; E1 runs the baselines' ``run.sh``, and E2-E4 run
+``main.py`` natively or in the ``experiments`` container (AGENTS.md,
+"Experiments").
 Paths handed to a container are relative to the repository root; a
 container writes root-owned files, so a driver creates each output directory
 on the host before a container writes into it, and writes its own summaries
@@ -19,6 +22,7 @@ own default, ``./data``.
 from __future__ import annotations
 
 import datetime
+import json
 import os
 import subprocess
 import sys
@@ -29,20 +33,6 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                     os.pardir, os.pardir, os.pardir))
 QUERIES = list(range(1, 23))
 
-# The study's configuration (docs/sf100-bottleneck-study.md, Reproduction):
-# no page cache, adaptive codecs, every search off, 256 MiB chunks.
-STUDY_FLAGS = ["--buffer_strategy", "cpu", "--compression", "adaptive",
-               "--compression_search", "off", "--sizing_search", "off",
-               "--no_debug", "--chunk_size_mb", "256"]
-
-# The plan's query groups (docs/page-geometry-plan.md, section 14).
-GROUPS = {
-    "A": [1, 6, 12, 14, 15, 19],      # mask re-decoding
-    "B": [3, 4, 10, 17, 18, 20, 21],  # re-read base and intermediate pages
-    "C": [2, 5, 7, 8, 9, 11, 13, 16, 22],  # under 1% decoding wasted
-    "D": [21, 7, 9, 20, 8, 5, 3],     # most of the flushed bytes
-    "E": [1, 15, 20, 18, 17, 10],     # direct compress at least 9%
-}
 
 
 def box_setting(key: str) -> str | None:
@@ -75,6 +65,56 @@ def data_dir() -> str:
     return path
 
 
+# The four baseline engines.  Each benchmarks on its own format-map datasets,
+# under $DATA_DIR/<engine>, which a suite's loop makes and drops one SF at a time
+# (baselines/datagen/engine_data.py); the experiment drivers only read them.
+BASELINE_ENGINES = ("sirius", "rapids", "polars_gpu", "duckdb_cpu")
+
+
+def engine_root(engine: str) -> str | None:
+    """``$DATA_DIR/<engine>`` (``DATA_DIR`` from the environment or
+    ``local.env``); None when no data root is set."""
+    top = box_setting("DATA_DIR")
+    return os.path.join(top, engine) if top else None
+
+
+def dataset_problems(root: str, sf: int, engine: str) -> list[str]:
+    """Why ``<root>/sf<sf>`` and the warm pass's ``<root>/sf1`` are not ready
+    for ``engine``, or [] when they are: a dataset is missing, or was not
+    generated from ``engine``'s format map (its ``NDSGEN.json``)."""
+    out = []
+    for s in sorted({1, sf}):
+        d = os.path.join(root, f"sf{s}")
+        if not os.path.isdir(os.path.join(d, "parquet")):
+            out.append(f"{d}: no dataset")
+            continue
+        try:
+            with open(os.path.join(d, "NDSGEN.json")) as f:
+                fmt = json.load(f).get("format", "")
+        except (OSError, ValueError):
+            fmt = ""
+        if not (fmt.startswith("map ") and fmt.split()[-1] == engine):
+            out.append(f"{d}: not {engine}'s format-map dataset "
+                       f"({fmt or 'no NDSGEN.json'})")
+    return out
+
+
+def source_commit() -> str:
+    """The engine code's commit, for the drivers' ``commit`` column: the
+    checkout's HEAD, ``+dirty`` when the tree differs from it outside
+    experiments/.  In the experiments container (``make experiments``), which
+    has no .git and runs the image's copy of the engine, the commit the image
+    was built from (``TQP_IMAGE_COMMIT``, which ``make build`` sets)."""
+    if not os.path.exists(os.path.join(ROOT, ".git")):
+        return os.environ.get("TQP_IMAGE_COMMIT") or "unknown"
+    commit = subprocess.run(["git", "-C", ROOT, "rev-parse", "--short", "HEAD"],
+                            capture_output=True, text=True).stdout.strip()
+    if subprocess.run(["git", "-C", ROOT, "diff", "--quiet", "HEAD", "--", ".",
+                       ":!experiments"], capture_output=True).returncode:
+        commit += "+dirty"
+    return commit
+
+
 def default_out(name: str) -> str:
     """``out/<name>/<YYYYmmdd-HHMM>``, relative to the tree root."""
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M")
@@ -91,9 +131,7 @@ def host_dir(rel: str) -> str:
 
 def node_cpus(gpu: str) -> str | None:
     """The CPU list of ``gpu``'s NUMA node, from its PCI address; None when
-    it cannot be found.  ``NODE_CPUS`` overrides it."""
-    if os.environ.get("NODE_CPUS"):
-        return os.environ["NODE_CPUS"]
+    it cannot be found."""
     try:
         bus = subprocess.run(
             ["nvidia-smi", "-i", str(gpu), "--query-gpu=pci.bus_id",
@@ -149,9 +187,9 @@ def compose(cmd: list[str], *, gpu: str, log: str,
 
 def main_cmd(sf: int, queries: list[int], perf_report: str,
              extra: list[str] = ()) -> list[str]:
-    """``python3 main.py`` with the study flags."""
+    """``python3 main.py`` at the engine's defaults, debug output off."""
     return ["python3", "main.py", "--SF", str(sf),
-            "--q", *map(str, queries), *STUDY_FLAGS, *extra,
+            "--q", *map(str, queries), "--no_debug", *extra,
             "--perf_report", perf_report]
 
 

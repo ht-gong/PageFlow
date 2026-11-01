@@ -48,6 +48,7 @@ x-engine: &engine
     target: engine
     args:
       CUDA_ARCHITECTURES: "${CUDA_ARCHITECTURES:-80;86;89;90}"
+      TQP_COMMIT: "${TQP_COMMIT:-unknown}"
   working_dir: /opt/TQP-Vortex
   ipc: host
   cap_add:
@@ -118,10 +119,11 @@ services:
       - ./profiling/results:/opt/TQP-Vortex/profiling/results
     command: ["python3", "-m", "profiling.sweep"]
 
-  # `make experiments SCRIPT=... ` — sweeps and figure generation.  The whole
-  # experiments/ tree is mounted so figures and CSVs land on the host;
-  # baselines/results read-only for the engine comparison's results
-  # (scaling_study.py --refresh), since the image leaves baselines/ out.
+  # `make experiments SCRIPT=... ` — the drivers and figure generation.  The
+  # whole experiments/ tree is mounted so figures and CSVs land on the host;
+  # baselines/ read-only for the engine comparison's results (all_results.csv,
+  # spill_profile.csv: the figures' default inputs) and spill_results.py, since
+  # the image leaves baselines/ out.
   experiments:
     <<: *engine
     profiles: ["tools"]
@@ -129,7 +131,7 @@ services:
       - *tables_ro
       - ./out:/opt/TQP-Vortex/out
       - ./experiments:/opt/TQP-Vortex/experiments
-      - ./baselines/results:/opt/TQP-Vortex/baselines/results:ro
+      - ./baselines:/opt/TQP-Vortex/baselines:ro
       - *codec_map_ro
     command: ["bash"]
 

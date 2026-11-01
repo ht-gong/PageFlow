@@ -1,9 +1,8 @@
 #!/usr/bin/env python
-"""tqp_vortex's spill-pass record builder (baselines/AGENTS.md, "Spill pass";
-docs/engine_spill_plan.md §3.4).
+"""tqp_vortex's spill-pass record builder (baselines/AGENTS.md, "Spill pass").
 
   tqp_spill_stats.py record <q_dir> --sf SF --query N --evidence-dir DIR
-  tqp_spill_stats.py settings <evidence_dir> --sf SF [--git REV]
+  tqp_spill_stats.py settings <evidence_dir> --sf SF
 
 The timed run of one main.py process (bench/run_tqp.sh with SPILL=1: the
 bench protocol, TQP_EXPERIMENT_TELEMETRY=1), from <q_dir>:
@@ -176,10 +175,8 @@ def cmd_record(a):
     sr.append_record(a.evidence_dir, rec)
 
 
-def _git(rev):
+def _git():
     """The checkout's commit, with "+dirty" when it has uncommitted changes."""
-    if rev:
-        return rev
     try:
         sha = subprocess.run(["git", "-C", ROOT, "rev-parse", "HEAD"], capture_output=True,
                              text=True, timeout=30).stdout.strip()
@@ -220,7 +217,7 @@ def cmd_settings(a):
     codec_map = os.path.join(ROOT, "profiling", "results", "codec_map.json")
     sr.write_settings(a.evidence_dir, ENGINE, a.sf, budgets, [],
                       [codec_map] if os.path.exists(codec_map) else [],
-                      {**cmd.get("versions", {}), "tqp_vortex": _git(a.git)},
+                      {**cmd.get("versions", {}), "tqp_vortex": _git()},
                       effective=cmd.get("effective"), env=cmd.get("env"),
                       codec_map=cmd.get("codec_map"), engine_gpu=cmd.get("gpu"),
                       slot_pool_b=(res.get("slot_pool") or {}).get("capacity_b"),
@@ -242,7 +239,6 @@ def main():
     s = sub.add_parser("settings")
     s.add_argument("evidence_dir")
     s.add_argument("--sf", type=int, required=True)
-    s.add_argument("--git", default=None, help="the engine's commit (default: git rev-parse here)")
     a = ap.parse_args()
     {"record": cmd_record, "settings": cmd_settings}[a.cmd](a)
 

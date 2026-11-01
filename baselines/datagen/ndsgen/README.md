@@ -24,7 +24,9 @@ instead of 4.2 h on the 92-core box.
   is dropped for the chunk.
 - **Formats**: uniform (`--compression`, `--dictionary`, `--writer-version`,
   the transcode knobs) or per column from the profiling pass's
-  `format_map.json` (`--format-map … --engine …`).
+  `format_map.json` (`--format-map … --engine …`). A delta-encoded string
+  column (DELTA_BYTE_ARRAY) gets chunk statistics but no column index: with
+  one, cudf's reader (cudf-Polars 26.06) decodes it wrong, in any writer's file.
 
 ```bash
 make data SF=100                            # dataset.sh -> $NDSGEN --sf 100 ...

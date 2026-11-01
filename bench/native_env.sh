@@ -1,8 +1,8 @@
 #!/bin/bash
-# The native TQP-Vortex environment, for a box without Docker (the Vast box of
-# docs/engine_spill_plan.md, §4 F4): the Dockerfile's base, deps and builder
-# stages as a venv, plus this checkout's engine modules in build/ and TQPlib/
-# (both gitignored). bench/run_tqp.sh runs main.py with it under TQP_NATIVE=1.
+# The native TQP-Vortex environment, for a box without Docker: the
+# Dockerfile's base, deps and builder stages as a venv, plus this checkout's
+# engine modules in build/ and TQPlib/ (both gitignored). bench/run_tqp.sh
+# runs main.py with it under TQP_NATIVE=1.
 #
 #   bench/native_env.sh [all]    venv, modules, check
 #   bench/native_env.sh venv     the venv at $TQP_ENV, exactly bench/native.lock

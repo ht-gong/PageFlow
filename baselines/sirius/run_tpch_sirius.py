@@ -27,6 +27,9 @@ with `CALL pin_table(..., tier='gpu')`, and DuckDB CPU fallback is off. Sirius
 serves a scan from a pin only if every column it projects was pinned, and falls
 back to the parquet reader silently otherwise, so a timed run whose log lacks
 an "assigned pinned entry" line for every pinned table is FAIL.
+SIRIUS_PIN_TIER=host pins them in Sirius's pinned host tier instead
+(`tier='host'`: decoded on the GPU, then copied to pinned host memory, one
+batch at a time), so the timed run copies them host->device; the same check.
 
   run_tpch_sirius.py <parquet_dir> <stream.sql> <out_csv> [SUBSET] [append]
     SUBSET  comma-separated query numbers, e.g. "9" or "1,2,3"  (default 1..22)
@@ -45,6 +48,7 @@ Environment:
                        (and, resident, whether the pins served its scans:
                        required then).
   LOAD_MODE            parquet (default) or resident
+  SIRIUS_PIN_TIER      resident: gpu (default) or host, pin_table's tier
   SPILL_STATS_DIR      the spill pass (AGENTS.md): each query runs with its own
                        config (quent on, state machines only), a DEBUG log,
                        sirius_set_query_label() before each pass and /proc io
@@ -85,6 +89,9 @@ if SPILL_STATS_DIR:
 RESIDENT = os.environ.get("LOAD_MODE", "parquet") == "resident"
 if RESIDENT and not LOG_DIR:
     sys.exit("LOAD_MODE=resident needs SIRIUS_LOG_DIR (the pin check reads the Sirius log)")
+PIN_TIER = os.environ.get("SIRIUS_PIN_TIER", "gpu")
+if PIN_TIER not in ("gpu", "host"):
+    sys.exit(f"SIRIUS_PIN_TIER must be gpu or host, not {PIN_TIER!r}")
 
 TABLES = ["customer", "lineitem", "nation", "orders",
           "part", "partsupp", "region", "supplier"]
@@ -112,11 +119,11 @@ def view_sql(root):
 
 
 def pin_sql(root, num):
-    """Resident: pin the query's columns of each table it reads, on the GPU. The
+    """Resident: pin the query's columns of each table it reads, in PIN_TIER. The
     glob expands to the same sorted file list as view_sql()'s, which is what lets
     the views' scans match the pin."""
     return "\n".join(
-        f"CALL pin_table('{root}/{t}/*.parquet', tier='gpu', name='{t}', "
+        f"CALL pin_table('{root}/{t}/*.parquet', tier='{PIN_TIER}', name='{t}', "
         f"cols=[{', '.join(repr(c) for c in cols)}]);"
         for t, cols in QUERY_COLUMNS[num].items())
 
@@ -143,7 +150,7 @@ def build_sql(num, stmts):
                  ".output",
                  view_sql(PARQUET)]
     else:
-        # The same, with the query's columns pinned on the GPU before each pass
+        # The same, with the query's columns pinned (PIN_TIER) before each pass
         # (untimed), and no CPU fallback: a fallback would read the parquet.
         parts = ["SET enable_duckdb_fallback=false;",
                  view_sql(WARM),
@@ -197,8 +204,12 @@ def log_segment(log_before):
         return None
     start = log_before[1] if log == log_before[0] else 0
     try:
-        with open(log, errors="ignore") as f:
-            return f.read()[start:]
+        # start is a byte offset (getsize): seek bytes, then decode; slicing the
+        # decoded text drifts past this run's start once the log holds multibyte
+        # characters (Sirius's NUMA warning has an em dash)
+        with open(log, "rb") as f:
+            f.seek(start)
+            return f.read().decode(errors="ignore")
     except OSError:
         return None
 
@@ -323,7 +334,7 @@ def run_query(num, stmts):
 def main():
     print(f"Sirius run | duckdb={DUCKDB}")
     print(f"config={os.environ.get('SIRIUS_CONFIG_FILE','<none>')} | warm={WARM} | timeout={TIMEOUT}s"
-          f" | load={'resident (GPU pins)' if RESIDENT else 'parquet'}")
+          f" | load={f'resident ({PIN_TIER} pins)' if RESIDENT else 'parquet'}")
     if not os.path.exists(DUCKDB):
         sys.exit(f"ERROR: duckdb binary not found at {DUCKDB} (build Sirius first)")
     queries = stream_queries(SF, STREAM)

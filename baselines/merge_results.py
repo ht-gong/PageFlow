@@ -14,7 +14,8 @@ around. Idempotent; atomic write.
 import csv, os, sys
 
 ENGINE_ORDER = ["duckdb_cpu", "sirius", "polars_gpu", "rapids", "tqp_vortex",
-                "duckdb_cpu_resident", "sirius_resident", "polars_gpu_resident", "rapids_resident"]
+                "duckdb_cpu_resident", "sirius_resident", "polars_gpu_resident", "rapids_resident",
+                "sirius_host"]
 FIELDS = ["engine", "scale_factor", "query", "status", "seconds", "rows_or_error"]
 
 

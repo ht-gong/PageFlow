@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """NVTX ranges for every pipeline and tick phase, for an Nsight trace
-(E5; docs/sf100-bottleneck-study.md §1.3).  Runs inside the ``dev``
-container.
+(E5).  Runs inside the ``dev`` container.
 
 Runs ``main.py`` in this process after installing two kinds of ranges:
 

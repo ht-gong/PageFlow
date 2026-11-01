@@ -1,4 +1,4 @@
-# AGENTS.md — running TQP-Vortex & operating rules
+# AGENTS.md — running PageFlow & operating rules
 
 Operational guide for agents (and humans) working in this repo: **how to run the
 engine** and the **rules that keep runs correct, reproducible, and safe on a shared
@@ -48,9 +48,10 @@ first or run through the `dev` service.
 - **Performance is the self-verification experiments.** `experiments/self-verification/`
   holds the drivers that measure a change: `e2_speedup.py` (how much faster, per query
   and suite: an in-process A/B over engine switches) and `e5_time_breakdown.py` (where
-  the time goes: an Nsight trace split by pipe and host step). The paper's ablation
-  and figures are in `experiments/paper_scripts/` (see "Other entry points",
-  "Experiments"). Tests never assert timings; experiments never assert results.
+  the time goes: an Nsight trace split by pipe and host step). The paper's
+  experiments (E1-E4) and figures are in `experiments/paper_scripts/` (see
+  "Other entry points", "Experiments"). Tests never assert timings; experiments
+  never assert results.
 
 ## ⛔ TIMING — WHICH NUMBER TO TRUST (READ THIS BEFORE ANY PERF CLAIM) ⛔
 
@@ -147,7 +148,7 @@ services, all behind profiles, so a bare `docker compose up` starts nothing.
 | `dev` | `make shell`, `docker compose run dev …` | **working tree** (bind mount) | read-only | `build/` on the `tqp-build` volume |
 | `plans` | `make plans` | **working tree** (writes `queries/plan-q*.txt`, `queries/pickles/`) | none | `build/` on `tqp-build` (no GPU) |
 | `profiling` | `make profiling` | image copy | read-only | `out/`, `profiling/results/` (**read-write**: writes the codec map) |
-| `experiments` | `make experiments` | image copy of the engine; host `experiments/` | read-only | `out/`, `experiments/`, `baselines/results/` (ro), `profiling/results/` (ro) |
+| `experiments` | `make experiments` | image copy of the engine; host `experiments/` | read-only | `out/`, `experiments/`, `baselines/` (ro), `profiling/results/` (ro) |
 | `spark` | `make spark` | image copy | none | `out/`, `queries/`, `profiling/results/` (ro) (no GPU) |
 
 `profiling/results/` holds **the codec map**, `codec_map.json`: the
@@ -190,7 +191,7 @@ out/<dir>`).
 | `out/query_times.csv` | `qid,approx_time`, appended by every run ever made |
 | `<perf_report dir>/` | see `--perf_report` |
 | `results.out` | each query's whole result (pandas text: a header line, then every row; Q16 at SF ≥ 100 writes `Q16 Output Skipped` instead), written to the working directory after the timed region: the host repo root under `dev`; lost with the container under `engine` unless `--perf_report` copies it |
-| `out/bench/<run>/` | `make bench`'s TQP-Vortex runs, one `<run>` per SF: each query's perf dir `q<q>/` (its `query_results.csv` keeps the load time) and console log `q<q>.log`, and the runner's `run.log`; nothing removes them |
+| `out/bench/<run>/` | `make bench`'s PageFlow runs, one `<run>` per SF: each query's perf dir `q<q>/` (its `query_results.csv` keeps the load time) and console log `q<q>.log`, and the runner's `run.log`; nothing removes them |
 
 Paths passed to `--perf_report`, `--log`, `--torch_profile`, `--sizing_config` and
 `--fixed_search_json` resolve against `/opt/TQP-Vortex`. Under `engine` and `test`
@@ -228,10 +229,10 @@ except `shell` and `spark`); `data`, `validate` and `summary` run
 | `make smoke` | `python3 main.py --smoke $(ARGS)` in `engine` |
 | `make test` | `python3 test.py $(ARGS)` in `test` |
 | `make q` | `python3 main.py --SF $(SF) [--q $(Q)] $(ARGS)` in `engine` |
-| `make bench SF="<sf> ..."` | the engine comparison (see "The engine comparison" below). With `tqp_vortex` among the engines (the default), it first stops if another process holds the GPU, runs `make build`, and makes each SF's and SF1's dataset where it is missing (`make data`). Then per SF: the four baseline engines in their image (`baselines/run.sh`), then `bench/run_tqp.sh` on the host, one `main.py --SF <sf> --q <q> --no_debug --perf_report out/bench/<run>/q<q>` per query in `engine`, each under `TQP_TIMEOUT`. Every engine's rows are merged into `baselines/results/all_results.csv`, TQP-Vortex's as `tqp_vortex`. With `RUN_CSV_DIR=<dir under $SCRATCH>` nothing is merged and a query × engine table ends the run |
+| `make bench SF="<sf> ..."` | the engine comparison (see "The engine comparison" below). With `tqp_vortex` among the engines (the default), it first stops if another process holds the GPU, runs `make build`, and makes each SF's and SF1's dataset where it is missing (`make data`). Then per SF: the four baseline engines in their image (`baselines/run.sh`), then `bench/run_tqp.sh` on the host, one `main.py --SF <sf> --q <q> --no_debug --perf_report out/bench/<run>/q<q>` per query in `engine`, each under `TQP_TIMEOUT`. Every engine's rows are merged into `baselines/results/all_results.csv`, PageFlow's as `tqp_vortex`. With `RUN_CSV_DIR=<dir under $SCRATCH>` nothing is merged and a query × engine table ends the run |
 | `make smoke-all` | `make bench` at SF1 on all five engines with nothing merged (`RUN_CSV_DIR=$SCRATCH/smoke`); fails unless every query is OK with the SF1 reference row counts |
 | `make spill SF="<sf> ..."` | the spill pass, shaped like `make bench` (its checks, `make build` and data first): per SF the GPU baselines through `baselines/run.sh` with `SPILL=1` (`duckdb_cpu` has no spill instrumentation), then `bench/run_tqp.sh` with `SPILL=1`: the bench protocol under `TQP_EXPERIMENT_TELEMETRY=1`, each query's perf report turned into a record of `baselines/results/spill_profile.csv` (`baselines/AGENTS.md`, "Spill pass"). Its times never reach `all_results.csv`. `SPILL_MERGE=0` keeps the records unmerged; the evidence goes to `$SPILL_ROOT` (default `$SCRATCH/spill`). |
-| `make spill-smoke` | `make spill` at SF1 under each engine's forced-pressure settings (`SPILL_SMOKE=1`; TQP-Vortex: the dataflow granule cache over a 4 MiB slot pool, its only pressure path), nothing merged (evidence in `$SCRATCH/spill_smoke`); fails unless every record keeps the contract, every query is OK, every identity its builder asserts holds and every engine spilled |
+| `make spill-smoke` | `make spill` at SF1 under each engine's forced-pressure settings (`SPILL_SMOKE=1`; PageFlow: the dataflow granule cache over a 4 MiB slot pool, its only pressure path), nothing merged (evidence in `$SCRATCH/spill_smoke`); fails unless every record keeps the contract, every query is OK, every identity its builder asserts holds and every engine spilled |
 | `make summary` | pivots of `baselines/results/all_results.csv`, and per SF the queries whose OK engines disagree on the row count |
 | `make shell` | interactive bash in `dev` |
 | `make plans` | `python3 -m parsing.regenerate [--q $(Q)] $(ARGS)` in `plans`: captures `queries/plan-q*.txt` with the pinned pyspark and lowers it to `queries/pickles/` (`ARGS=--lower-only` skips Spark) |
@@ -269,21 +270,21 @@ own are `./data` and GPU 0). Build-time settings read from the environment by
 
 `baselines/` is the engine comparison. In its own image it makes the TPC-H data
 (`make data`) and runs the 22 queries on four other engines
-(Spark-RAPIDS, cudf-polars, DuckDB, Sirius); `make bench` runs TQP-Vortex on the
+(Spark-RAPIDS, cudf-polars, DuckDB, Sirius); `make bench` runs PageFlow on the
 same data as the fifth. `baselines/AGENTS.md` is its guide: the data generator,
 the four baseline engines and their runners, the protocol (one process per
 query, an untimed SF1 warm pass, one timed run) and the results contract of
-`baselines/results/all_results.csv`, where TQP-Vortex is the engine `tqp_vortex`,
+`baselines/results/all_results.csv`, where PageFlow is the engine `tqp_vortex`,
 with its timer's bounds and its known-wrong values.
 
 Its one-generator rule (`baselines/results/GENERATOR.md`: every engine reads the
-same validated parquet, never data it wrote itself) covers TQP-Vortex too: its scan
+same validated parquet, never data it wrote itself) covers PageFlow too: its scan
 reads that parquet and nothing else.
 
 ## Native runs (no Docker)
 
-On a box without Docker (an unprivileged container such as the Vast box of
-`docs/engine_spill_plan.md`) the engine runs on the host, from a checkout:
+On a box without Docker (an unprivileged container, for example) the engine
+runs on the host, from a checkout:
 
 - **The environment.** `bench/native_env.sh` makes a venv at `/opt/envs/tqp`
   (`TQP_ENV`) from the system Python 3.12 with exactly `bench/native.lock`: the
@@ -800,7 +801,7 @@ documented with the pools they size in "Memory: pools and sizing".
 ### Sizing search
 
 - **`--sizing_search {off,per_pipe,mid_stream}`** (default `off`) — adaptive chunk
-  sizing (`docs/adaptive_intermediate_sizing.md`).
+  sizing (`adaptive/README.md`).
   - `off`: every pipe runs at `--chunk_size_mb`.
   - `per_pipe`: every tick-loop pipe (sort / join core / aggregate / filter / project)
     starts at `c0` (`--chunk_size_mb` unless the config sets `c0_mb`). One that can
@@ -1029,8 +1030,7 @@ run starts.
   round's groups are emitted (cloned unless it is the last round) and the run, or the
   dynamic accumulator, reset. Rows stage in a fixed slab of min(2^26, the largest
   round's) rows, freed before the last round emits, and a full slab merges in views
-  of at most 2^26 rows (`operators/aggregate.py`,
-  `docs/adaptive_intermediate_sizing.md`). The dense state, the fixed run and the
+  of at most 2^26 rows (`operators/aggregate.py`). The dense state, the fixed run and the
   stage slab are allocated as they are, borrowing from the cache region on a miss
   like every other allocation; when one still does not fit, pass 2 takes the next
   route (the dense state the sorted run's, the fixed run a dynamic accumulator:
@@ -1072,11 +1072,12 @@ you set next to the numbers)
 | `KVIKIO_NTHREADS` | `32` | int | libkvikio's file-read threads, which cuDF's parquet reader (`IO/parquet_reader.py`) reads through; libkvikio reads it once, at the first read. Importing the reader sets it to 32 unless the environment sets it (1 thread decodes the SF100 parquet at about 9 GB/s, 8 to 32 at about 16). |
 | `TQP_NUMA_BIND` | on | off only for `0`, `false`, `False`, empty | Bind the pinned host pool to GPU 0's NUMA node with `mbind` ("Host: the pinned pool"). Off pins it unbound, for a box that refuses `mbind`; the native runner sets `0` unless it is set. Read at import (`utility.numa.NUMA_BIND`). |
 | `TQP_RAW_INTERMEDIATES` | off | on-word | Every intermediate (non-scan column instance) resolves RAW; the scan's reps still follow `--compression`. For any strategy, the free-list baseline's included. Refused with a `--compression_search` other than `off` (it would override the fixed search's pins and leave the searches' menus no compressed candidate). |
+| `TQP_NO_DECODE_WINDOWS` | off | any value but `0` or empty | An experiment switch: the gather's index is decoded whole (`col_to_gpu`) instead of a window of whole records at a time when it is compressed and larger than the chunk budget (`IO.pipeline.common.col_to_gpu_windowed`). The sort's payload windows are not affected. Read at each gather. E3 (`e3_allocation_ablation.py`) sets it, for the free-list baseline's comparison. |
 | `TQP_ARENA_BLOCK_B` | 1 MiB | int, bytes | The GPU arena's block size (a positive multiple of 512; not with `--uvm`): every allocation is rounded up to whole blocks and starts on a block boundary, and a granule of the granule cache is one block. `512` makes the arena byte-granular (512-B aligned), for the free-list baseline; below 1 MiB, cuDF's small buffers no longer share blocks during the scan (`utility/rmm_arena.small_buffers`). |
 | `TQP_SERIAL_TICKS` | off | on-word | An experiment switch: every pipe runs under the tick barrier with nothing overlapped (a tick's input copies end before its compute starts; the pack's and the home writer's copies end before the next copy or compute). Read at pipe construction (`IO.pipeline.vortex_pipeline.SERIAL_TICKS`). Rearrange gathers are serial either way. |
 | `TQP_FREELIST_SQUEEZE_GB` | unset | number, GiB | `--buffer_strategy freelist` only, a correctness stress (never a timing setting): hold that much of the arena through each query's timed run, so its operators and regions run in a smaller arena while its scan, before the timer, has the whole one (`tests/e2e/test_freelist.py`); the reported arena peaks include it. |
 | `TQP_HASH_SEED` | `2029` | int | Base seed of the grouping-hash coefficients. 2029 is the seed validated collision-free (`tests/operators/test_hash_seed_injective.py`); another value can produce wrong group-by results. |
-| `TQP_CACHE_CORE` | `native` | `native` or `cpu` | With a cache (`--buffer_strategy` other than `cpu`), whether each query occurrence runs it: the granule cache over the C++ core `TQPlib.tqpcache` (`native`, `IO/cache/native_cache.py`), or none for this occurrence (`cpu`: the occurrence sizes no cache region and has the whole cmp pool as operator space). Any other value fails each occurrence with a `ValueError`. Read into `IO.cache.config.CORE` at import; `main.py` reads it at the top of each occurrence, so `switch_ab.py` can alternate it (`docs/cache-host-overhead-investigation.md`). |
+| `TQP_CACHE_CORE` | `native` | `native` or `cpu` | With a cache (`--buffer_strategy` other than `cpu`), whether each query occurrence runs it: the granule cache over the C++ core `TQPlib.tqpcache` (`native`, `IO/cache/native_cache.py`), or none for this occurrence (`cpu`: the occurrence sizes no cache region and has the whole cmp pool as operator space). Any other value fails each occurrence with a `ValueError`. Read into `IO.cache.config.CORE` at import; `main.py` reads it at the top of each occurrence, so `switch_ab.py` can alternate it. |
 | `TQP_CACHE_POLICY` | unset | `lru`, `mru` or `dataflow` | The policy of each occurrence's cache instead of `--buffer_strategy`'s (`IO.cache.config.POLICY`); the cache is empty between queries, so the policy swaps. |
 | `TQP_CACHE_FLOOR` | `1` | int, granules | A cacheable output region of fewer bytes than this many granules is not offered to the cache and goes home as a plain region (`IO.cache.config.FLOOR_GRANULES`, `IO/codec/region_producer.py`); `0` offers every region. |
 | `TQP_CACHE_PLAN` | on | on-word | The reader derives each tick's cached spans, settle spans and granule ids when the tick's layout is compiled (`IO.cache.config.PLAN_AT_COMPILE`, `IO/transfer/tick_layout.py`), and binds the stages of a tick that read only cached regions with one `pieces` call, instead of per column per tick from the record selection; `0` (any non-on-word) turns it off. |
@@ -1173,39 +1174,131 @@ import, so setting it inside a running process changes nothing. Every one is on-
   NUMA node like a timed run and is a GPU job: rule 1 applies (one at a time,
   idle card). After editing `profiling/`, `make build` first or run it through
   `dev` (`TQP_GPU=<idle> TQP_DATA_DIR=<DATA_DIR> docker compose run --rm -T dev python3 -m profiling.sweep`),
-  which writes the same host directory. The figures over its CSVs live in
-  `experiments/paper_scripts/figures/make_regret_fig.py` and
-  `make_pareto_fig.py` (`make experiments SCRIPT=…`); they only plot the
+  which writes the same host directory. The figure over its CSVs is
+  `experiments/paper_scripts/figures/make_regret_fig.py`; it only plots the
   shipped map.
-- **Experiments (performance)** (`experiments/`). The drivers run on the host
-  (`python3 <driver>.py --help`); each runs its engine passes one at a time in
-  the working tree's `dev` container on `--gpu`, pinned to that GPU's NUMA
-  node, and writes under `out/<driver>/<timestamp>/`. They take their defaults
-  as the Makefile does (`paper_scripts/helpers/common.py`): `--gpu` is
-  `TQP_GPU`, else `GPU`, else 0, and the data root is `TQP_DATA_DIR`, else
-  `$DATA_DIR`, with `DATA_DIR` and `GPU` from the environment or
-  `local.env`. Without a data root a driver stops rather than mount
-  compose's `./data`.
+- **Experiments (performance)** (`experiments/`). The drivers are scripts
+  (`python3 <driver>.py --help`) that run their engine passes one at a time
+  on `--gpu`, pinned to that GPU's NUMA node. They take their defaults as the
+  Makefile does (`paper_scripts/helpers/common.py`): `--gpu` is `TQP_GPU`,
+  else `GPU`, else 0, and the data root is `TQP_DATA_DIR`, else `$DATA_DIR`,
+  with `DATA_DIR` and `GPU` from the environment or `local.env`; E1, like
+  `make bench`'s baselines, reads only `GPU` and `DATA_DIR`. Without a data
+  root a driver stops rather than mount compose's `./data`. Each step runs
+  with Docker or without it (`$TQP_ENV` is `bench/native_env.sh`'s venv,
+  "Native runs"):
 
-  | Driver | Question | Reads |
+  | Step | With Docker | Without Docker |
   |---|---|---|
-  | `self-verification/e2_speedup.py` | How much faster, per query and suite? An in-process A/B over engine switches, so the host's drift cancels | `query_times.csv` |
-  | `self-verification/e5_time_breakdown.py` | Where the time goes: an Nsight trace with NVTX ranges, kernel/copy/idle per pipe class and host step (attribution, not timing) | the trace |
-  | `paper_scripts/e6_ablation.py` | What each mechanism buys: the four-arm ladder and the paper's figures 1-5 | `query_times.csv`, `sizing_model`, `compression`, the ledger |
+  | E1, `make -C baselines engine-data`, `make data`, and `make bench`'s and `make spill`'s baselines | the driver on the host (`python3`, standard library only), the engines in the baselines' image (`baselines/docker/run.sh`, E1's default `--launcher`) | not on main: `baselines/run.sh` needs the image's tool paths (`baselines/AGENTS.md`), so a `--launcher` (`BASELINES_LAUNCHER`) that sets them on a box without Docker is that box's own |
+  | E2, E3, E4 | `make experiments SCRIPT=experiments/paper_scripts/<driver>.py ARGS="…"`: the image's engine and Python. In the container the GPU is 0 (`TQP_GPU` picks it: leave `--gpu` out) and the data root `/data/tables`; outputs reach the host only under `out/` or `experiments/` (e.g. `--csv out/e2/ablation_results.csv`); the CSVs' `commit` is the image's (`TQP_IMAGE_COMMIT`, which `make build` sets), so `make build` first; E2's check that `main.py` is on `--gpu`'s bus cannot see the container's PIDs and does not run | `python3 experiments/paper_scripts/<driver>.py --python $TQP_ENV/bin/python --gpu <N>` from a checkout (`--python` defaults to `/opt/envs/tqp/bin/python` when it exists, else the driver's own Python) |
+  | `self-verification/e2_speedup.py`, `e5_time_breakdown.py` | the driver on the host, the engine in the working tree's `dev` container | not on main: they start `dev` themselves |
+  | The codec sweep | `make profiling ARGS="…"` | `$TQP_ENV/bin/python -m profiling.sweep` with a native run's environment ("Native runs", by hand) |
+  | Figures (`paper_scripts/figures/`) | `make experiments SCRIPT=experiments/paper_scripts/figures/<script>.py ARGS="…"` (the image has the font) | `$TQP_ENV/bin/python experiments/paper_scripts/figures/<script>.py`, or any Python with `requirements-dev.txt` and the Linux Biolinum font (`fonts-linuxlibertine`, or TeX Live's copy) |
+
+  E4's GPM sampler runs under the engine's Python (`--python`; its
+  `nvidia-ml-py` is in `requirements-dev.txt`).
+
+  | Driver | Question | Reads | Writes |
+  |---|---|---|---|
+  | `self-verification/e2_speedup.py` | How much faster, per query and suite? An in-process A/B over engine switches, so the host's drift cancels | `query_times.csv` | `out/e2_speedup/<time>/` |
+  | `self-verification/e5_time_breakdown.py` | Where the time goes: an Nsight trace with NVTX ranges, kernel/copy/idle per pipe class and host step (attribution, not timing) | the trace | `out/e5_time_breakdown/<time>/` |
+  | `paper_scripts/e1_motivation.py` (E1) | How the four baseline engines scale (the motivation figure; the baselines of `fig_baselines` and `fig_scaling`): one engine (`--engine`) at SF30-1000, cudf-Polars, Spark-RAPIDS and DuckDB resident below SF100 and from parquet from it, Sirius host-pinned (`sirius_host`) at every SF, on the engine's own format-map datasets, which it never makes (exit 3 when not ready); each query `--reps` (2) processes, the mean merged; every query process capped at `--timeout` (3600 s). Without `--engine`: the whole suite's plan | `baselines/run.sh`'s rows | `baselines/results/all_results.csv`; `run.sh`'s log and each rep's rows in `out/e1_motivation/<time>/` |
+  | `paper_scripts/e2_end_to_end_ablation.py` (E2) | The end-to-end ladder: UVM, then PageFlow RAW, ANS and adaptive, at one SF (default 1000); each setting `--reps` (2) `main.py` processes over the suite, their mean. `--settings tqp_adaptive --sf <SF>` at SF100, 400 and 700 is `fig_scaling`'s PageFlow (its SF1000 is the ladder's) | `query_times.csv` | `paper_scripts/results/ablation_results.csv`; logs and perf reports in `out/e2_end_to_end_ablation/` |
+  | `paper_scripts/e3_allocation_ablation.py` (E3) | The free-list baseline, with a reserve and without, against PageFlow | `query_times.csv` | `paper_scripts/results/allocation_ablation_results.csv`; `out/e3_allocation_ablation/` |
+  | `paper_scripts/e4_ablation_profile.py` (E4) | Where the time goes in E2's PageFlow settings: an Nsight trace and NVML GPM samples per query (shares, not timings) | the traces, `gpm.csv`, E2's CSV | `paper_scripts/results/ablation_profile.csv`, `ablation_profile_summary.csv`; `out/e4_ablation_profile/` |
+
+  **The cross-system figures from scratch** (`fig_motivation_geomean`, the
+  intro figure; `fig_baselines`; `fig_scaling`). Their baselines are E1's
+  rows, PageFlow's E2's. E1 runs one engine on datasets it does not make, `$DATA_DIR/<engine>/sf<SF>` and `sf1`, each from
+  that engine's format map (`baselines/AGENTS.md`, "Before every benchmark";
+  Sirius's for `sirius_host`). One (engine, SF) at a time, so one dataset is on
+  the disk at once:
+  1. `make -C baselines image` (both Sirius builds), then the format map:
+     `make -C baselines ablation SF=5` writes `baselines/results/format_map.json`
+     and `format_profile.csv` (never committed; the paper's are on
+     `archive/results-2026-10-26`, `main-checkout/baselines/results/`).
+  2. `python3 experiments/paper_scripts/e1_motivation.py` lists every
+     (engine, SF) with queries left and whether its data is ready.
+  3. Per cell: `make -C baselines engine-data CMD="make <engine> <SF>"` (the
+     disk guard, then ndsgen; `CMD="status"` shows what holds the disk), then
+     `e1_motivation.py --engine <engine> --sf <SF>`, then `CMD="drop <engine>
+     <SF>"`; after an engine's last SF, drop its `sf1` too. Exit 3 means the
+     data was not ready: make it, never go around it. The driver skips rows
+     already in `all_results.csv`, so an interrupted loop resumes.
+  4. Cells with failures: `--overwrite failed` reruns their non-OK queries (the
+     figures' rows: up to four more times each).
+  5. PageFlow: E2 at SF1000 (the ladder, its default) and
+     `e2_end_to_end_ablation.py --settings tqp_adaptive --sf <SF>` at SF100,
+     400 and 700, each on `$DATA_DIR/sf<SF>/parquet` (`make data SF=<SF>`);
+     `--only_failed` reruns a setting's queries that are not OK.
+  6. In `experiments/paper_scripts/figures/`: `make_motivation_geomean_fig.py
+     --stats`, `make_baselines_fig.py`, `make_scaling_fig.py --stats` (with
+     Docker or without it, as in the table above).
 
   `self-verification/helpers/` holds the in-process A/B (`switch_ab.py`),
-  `nvtx_ranges.py` and `trace_analyze.py`;
-  `paper_scripts/helpers/` the ablation and its figures plus what both folders
-  share (`common.py`, `perf_json.py`). `paper_scripts/figures/` holds the
-  paper figures drawn from hand-copied or external numbers
-  (`scaling_study.py`, `make_motivation_fig.py`, `make_tpch_comparison_fig.py`)
-  and the codec-sweep figures; `scaling_study.py --refresh` checks its inline
-  numbers against `baselines/results/all_results.csv` (`TQP_BASELINES_CSV`
-  overrides it).
+  `nvtx_ranges.py` and `trace_analyze.py`; `paper_scripts/helpers/` E4's GPM
+  sampler, the spill-pass reader the off-GPU figures share
+  (`spill_profile.py`), and what both folders share (`common.py`,
+  `perf_json.py`). `paper_scripts/figures/` holds the paper's figure and table
+  scripts; every figure is drawn in its SIGMOD style (`sigmod_style.py`). Each reads its numbers
+  from the files listed under "Results are never committed" and carries none
+  in its source.
 - **Spark plan parsing**: `make spark` opens an interactive shell with JDK +
   pyspark (image copy of the code, `queries/` mounted) for `parsing/layer.py`.
   Regenerate checked-in plans with `make plans`, not from this shell: a shared
   JVM shifts the column ids.
+
+## Results are never committed
+
+Timing and measurement files stay on the box that made them; git holds only
+the code that writes and reads them.
+
+- **Never committed:** every `query_times.csv`, `query_results.csv` and perf
+  report; `baselines/results/` `all_results.csv`, `spill_profile.csv`,
+  `format_profile.csv` and `format_map.json`; the drivers' CSVs in
+  `experiments/paper_scripts/results/`; `profiling/results/` (the codec map
+  and the sweep CSVs); spill records, traces, logs and rendered figures. The
+  `.gitignore`s cover these paths (`*.csv` and `result*` at the root,
+  `results/*.csv`, `*.json` and `*.jsonl` in `baselines/`); never force-add
+  one. The only tracked measurement files are test fixtures
+  (`tests/verification/`, `baselines/tests/fixtures/`).
+- **No number in a script.** A figure or table script reads every number it
+  draws from one of the files below, at its default path or the one a flag
+  names, and prints what it leaves out. It never carries a measured, supplied,
+  imputed or relabelled number in its source. A value that is not a
+  measurement (an estimate) comes from a file of its own and is labelled as
+  one in the figure.
+- **Keeping a result set** (for a paper): archive it outside `main` (an orphan
+  `archive/results-<date>` branch), with what made each file. The drivers' CSVs
+  carry `commit` (`+dirty` for an uncommitted tree), `flags` and `gpu` per row,
+  and a perf report's `cmdline.json` the resolved settings.
+
+What writes what. Every figure script takes the path as a flag (in
+parentheses), so it can read a result set wherever it is kept:
+
+| File (default path) | Written by | Read by |
+|---|---|---|
+| `query_times.csv`; with `--perf_report <dir>`: `<dir>/query_times.csv`, `query_results.csv`, `SF<sf>_<q>.json`, `cmdline.json` | `main.py` | every driver below |
+| `baselines/results/all_results.csv` (`--baselines`, `TQP_BASELINES_CSV`) | `make bench SF=<sf>`: each baseline engine through `baselines/run.sh` on its own format-map dataset (`baselines/AGENTS.md`, "Before every benchmark"), `tqp_vortex` through `bench/run_tqp.sh` (one `main.py` per query at the engine's default flags: it passes no others), merged by `baselines/merge_results.py` | `make summary`. No figure reads its `tqp_vortex` rows. Its `polars_gpu`, `rapids` and `duckdb_cpu` rows at SF100 and above have E1's keys (below) and replace E1's: one timed run, not E1's mean of its reps. Its `sirius` rows are not the figures' (`sirius_host`), and below SF100 its keys are not E1's (`*_resident`) |
+| `baselines/results/all_results.csv`: the `*_resident` rows of `polars_gpu`, `rapids` and `duckdb_cpu` at SF30 and SF50, their parquet rows at SF100-1000, and the `sirius_host` rows (`--baselines`, `TQP_BASELINES_CSV`) | E1, one engine and SF at a time on that engine's format-map dataset (below) | `make_motivation_geomean_fig.py` (the intro figure, SF30-700); `make_baselines_fig.py` (the baselines' bars, SF1000); `make_scaling_fig.py` (the baselines, SF100-1000) |
+| `baselines/results/spill_profile.csv` (`--spill`, `TQP_SPILL_CSV`); `$SPILL_ROOT/sf<sf>/<engine>/records.jsonl` | `make spill SF=<sf>` (PageFlow at its default flags) | `make_spill_fig.py`, `make_intermediates_fig.py`, `make_offgpu_table.py`; PageFlow's records through `--tqp` |
+| `experiments/paper_scripts/results/ablation_results.csv` (`--csv`; `make_baselines_fig.py --e2`, `make_scaling_fig.py --e2`) | E2 | `make_ablation_fig.py`; `make_baselines_fig.py` (PageFlow's bars: setting `tqp_adaptive`, SF1000); `make_scaling_fig.py` (PageFlow: `tqp_adaptive`, SF100-1000); E4 (its `e2_mean_s` column) |
+| `experiments/paper_scripts/results/allocation_ablation_results.csv` (`--csv`) | E3 | `make_allocation_fig.py` |
+| `experiments/paper_scripts/results/ablation_profile.csv` (`--profile`) | E4 | `make_ablation_fig.py`, `make_query_breakdown_fig.py` |
+| `profiling/results/codec_map.json`, `sweep_per_column.csv`, `sweep_by_class.csv`, `scan_frequency.csv` | `make profiling` | the engine (`codec_map.json`); `make_regret_fig.py` |
+
+Four figure inputs have no producer on main. A script stops without a
+required one and leaves an optional one's part out. The last copies of these
+files are on the orphan branch `archive/results-2026-10-26` (data only: the
+one-off harnesses that made them were not kept):
+
+| Input | Read by | What it must hold |
+|---|---|---|
+| `--panel CSV LABEL` (defaults `experiments/paper_scripts/results/h100_30gb_raw_adaptive.csv`, `h100_full_raw_adaptive.csv`, `e2_raw_adaptive_all_results.csv`) | `make_transfer_fig.py` | one CSV per GPU configuration, in `all_results.csv`'s columns, with `tqp_raw*` and `tqp_adaptive*` engine rows run with E2's settings of those names |
+| `--pf-raw`, `--pf-adaptive` | `make_offgpu_table.py` (required) | PageFlow spill-pass `records.jsonl` (`bench/tqp_spill_stats.py`'s records) of its RAW and its adaptive setting; `make spill` runs only PageFlow's default flags |
+| `--sirius-split` | `make_offgpu_table.py` (required), `make_spill_fig.py` (optional) | per query, Sirius's intermediate (non-scan) bytes spilled to its host tier and their peak there, from its quent traces |
+| `--polars` | `make_intermediates_fig.py` (required) | per query, `sf1000_boundary_est_b`: an estimate (cudf-Polars's boundary share of node outputs at SF100 times the SF1000 spill pass's node outputs), drawn as "est." |
 
 ## Notes for agents editing the engine
 

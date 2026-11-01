@@ -68,7 +68,7 @@ CATEGORIES = (
 
 # Each engine's closed list of kinds, {kind: category}, in CSV order. Every
 # record has every kind of its engine, zeros included. Readers aggregate by
-# category, never by kind name. Sources: docs/engine_spill_plan.md §3.
+# category, never by kind name.
 KINDS = {
     "sirius": {
         "scan": "scan_in",                 # wire: /proc rchar of the timed run minus disk restores; logical: GPU_SCAN-born batches

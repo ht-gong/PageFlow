@@ -84,15 +84,7 @@ SETTINGS: list[Setting] = [
     Setting("tqp_ans", "TQP, ANS", _tqp("ANS")),
     Setting("tqp_adaptive", "TQP, adaptive + searches",
             _tqp("adaptive", "read-and-write", "mid_stream")),
-    # Diagnostic splits of tqp_adaptive (not in the default --settings).
-    Setting("tqp_adaptive_static", "TQP, adaptive, searches off",
-            _tqp("adaptive")),
-    Setting("tqp_adaptive_cs", "TQP, adaptive + compression search",
-            _tqp("adaptive", "read-and-write")),
-    Setting("tqp_adaptive_sz", "TQP, adaptive + sizing search",
-            _tqp("adaptive", "off", "mid_stream")),
 ]
-DEFAULT_SETTINGS = ["uvm", "tqp_raw", "tqp_ans", "tqp_adaptive"]
 BY_KEY = {s.key: s for s in SETTINGS}
 
 # What a setting's process gets of the ambient environment: never a TQP_*
@@ -113,7 +105,6 @@ def setting_cmd(s: Setting, args, qids: list[int], perf_dir: str) -> list[str]:
            "--cmp_pool_gb", str(args.cmp_pool_gb), "--no_debug", *s.flags]
     if s.key != "uvm":
         cmd += ["--slot_pool_gb", f"{args.slot_pool_gb:g}"]
-        cmd += args.engine_flags.split()
     return cmd + ["--perf_report", perf_dir]
 
 
@@ -260,7 +251,9 @@ def run_rep(s: Setting, args, work: str, rep: int):
                   "rest", flush=True)
     res = os.path.join(ROOT, "results.out")
     if os.path.exists(res):
-        os.replace(res, os.path.join(perf_dir, "results_all.out"))
+        # A move, not os.replace: in the experiments container ROOT is the
+        # image's and perf_dir a mounted out/, another filesystem.
+        shutil.move(res, os.path.join(perf_dir, "results_all.out"))
     return outcomes, restarts
 
 
@@ -346,7 +339,7 @@ def show(args, todo: list[Setting]) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--settings", nargs="+", choices=list(BY_KEY),
-                    default=DEFAULT_SETTINGS)
+                    default=list(BY_KEY))
     ap.add_argument("--overwrite", action="store_true",
                     help="rerun the settings that are already in the CSV and "
                          "replace their rows")
@@ -382,10 +375,6 @@ def main() -> int:
                          "queries that are not OK there (or missing), and "
                          "replace just their rows; the work goes to "
                          "<work>/retry/<setting>/"),
-    ap.add_argument("--engine_flags", default="",
-                    help="extra main.py flags for the TQP settings (a "
-                         "diagnostic sweep, e.g. a --sizing_config); they "
-                         "are not part of the CSV key")
     ap.add_argument("--wait_idle", action="store_true",
                     help="wait for the GPU to be idle instead of stopping")
     ap.add_argument("--show", "--dry-run", action="store_true", dest="show",
@@ -429,12 +418,7 @@ def main() -> int:
     if not os.path.isdir(os.path.join(args.data, f"sf{args.sf}", "parquet")):
         sys.exit(f"no sf{args.sf}/parquet under {args.data}")
 
-    commit = subprocess.run(["git", "-C", ROOT, "rev-parse", "--short",
-                             "HEAD"], capture_output=True,
-                            text=True).stdout.strip()
-    if subprocess.run(["git", "-C", ROOT, "diff", "--quiet", "HEAD", "--",
-                       ".", ":!experiments"]).returncode:
-        commit += "+dirty"
+    commit = common.source_commit()
     for s in todo:
         while busy := gpu_busy(args.gpu):
             if not args.wait_idle:

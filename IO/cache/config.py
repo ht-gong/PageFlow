@@ -6,8 +6,7 @@ cache region; intermediates stay on the GPU as arena regions, and an
 allocation that misses stalls while the least recently used of them are
 evicted to their homes until it fits (``IO/pages/device_regions.py``).
 
-The four switches below are the cache-core work's
-(``docs/cache-host-overhead-investigation.md``), each read at its use so
+Each of the four switches below is read at its use so
 ``experiments/self-verification/helpers/switch_ab.py`` can set it per query
 occurrence; their defaults come from the environment, for ``tests/e2e``:
 

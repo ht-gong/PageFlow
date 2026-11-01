@@ -1,4 +1,4 @@
-# `compression/` — GPU column compression for TQP-Vortex
+# `compression/` — GPU column compression for PageFlow
 
 This directory holds everything the engine needs to compress and decompress
 columns on the GPU: the nvCOMP-backed CUDA extension, the Python-side
@@ -28,8 +28,8 @@ The pieces fit together like this:
    process on first use; this module is its only reader. It is pure Python
    with no CUDA or torch dependency.
 
-Consumers live mostly in `IO/` (`page.py`, `batched_decompress.py`,
-`manager_compress.py`, `record_table.py`), in
+Consumers live mostly in `IO/` (`codec/batched_decompress.py`,
+`codec/manager_compress.py`, `pages/record_table.py`), in
 `adaptive/`, `dataflow/compression_applier.py`, `profiling/sweep.py` and
 `main.py`. Tests are under `tests/compression/`. The offline sweep that
 writes the codec map is described in `profiling/README.md`.

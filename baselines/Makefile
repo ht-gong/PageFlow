@@ -6,6 +6,8 @@
 #   make image                                 build the image for the current pins
 #   make doctor                                versions, GPU, io_uring, free space
 #   make data SF=100 / make validate SF=100    generate (if missing) + validate $DATA_DIR/sf100
+#   make engine-data CMD="make sirius 30"      one engine's format-map dataset, $DATA_DIR/<engine>/sf<SF>
+#                                              (datagen/engine_data.py: status | need | make | drop)
 #   make bench SF=100 [ENGINES="..."]          TPC-H q1-22 -> results/all_results.csv
 #   make smoke                                 SF1, all engines, nothing merged
 #   make ablation [SF=5 ENCODINGS= COMPRESSIONS= ROUNDS= ENGINES= TOL= OUT=]
@@ -31,7 +33,7 @@ ablation: SF ?= 5
 
 need = $(if $($(1)),,$(error $(1) is required, e.g. `make $@ $(1)=$(2)`))
 
-.PHONY: image shell doctor data validate bench smoke ablation summary \
+.PHONY: image shell doctor data engine-data validate bench smoke ablation summary \
         spill spill-smoke spill-test
 
 image:
@@ -46,6 +48,10 @@ doctor:
 data:
 	$(call need,SF,100)
 	$(RUN) datagen/dataset.sh $(SF)
+
+engine-data:
+	$(call need,CMD,status)
+	$(RUN) bash -c '"$$PY" datagen/engine_data.py $(CMD)'
 
 validate:
 	$(call need,SF,100)

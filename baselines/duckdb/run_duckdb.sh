@@ -6,7 +6,9 @@
 #
 # Env: TPCH_PARQUET (dataset), TPCH_SF, WARM_PARQUET (SF1 warm copy), PY (the
 # image's py env, which has duckdb 1.5.5), and optionally DUCKDB_THREADS,
-# DUCKDB_MEMORY_LIMIT, DUCKDB_TEMP_DIR, TPCH_MERGE=0 (keep temp CSV).
+# DUCKDB_MEMORY_LIMIT, DUCKDB_TEMP_DIR, TPCH_MERGE=0 (keep temp CSV),
+# QUERY_TIMEOUT (kill a query's process after this many seconds; 0 = never;
+# row -> TIMEOUT, as the other runners).
 # Tables are views over the ramdisk parquet: every run reads it. One process per
 # query, which first runs the query on the SF1 copy, untimed (run.sh protocol).
 # LOAD_MODE=resident + ENGINE_KEY=duckdb_cpu_resident (run.sh sets both) load
@@ -23,6 +25,7 @@ STREAM="${STREAM:-${ROOT}/results/queries/stream_qualification.sql}"
 ENGINE_KEY="${ENGINE_KEY:-duckdb_cpu}"
 OUT_CSV="${OUT_CSV:-/tmp/tpch_${ENGINE_KEY}_sf${TPCH_SF}.csv}"
 LOG="${LOG:-${ROOT}/results/${ENGINE_KEY/duckdb_cpu/duckdb}_run.log}"
+QUERY_TIMEOUT="${QUERY_TIMEOUT:-0}"
 : "${WARM_PARQUET:?WARM_PARQUET is not set (the SF1 warm copy)}"
 
 [ -d "${TPCH_PARQUET}" ] || { echo "ERROR: no parquet dir at ${TPCH_PARQUET}" >&2; exit 1; }
@@ -36,9 +39,21 @@ PY="${PY:?PY is not set}"
 echo "[$(date +%H:%M:%S)] ${ENGINE_KEY} SF${TPCH_SF} queries=[${QUERIES}] parquet=${TPCH_PARQUET} python=${PY}" | tee "${LOG}"
 for q in ${QUERIES}; do
   echo "[$(date +%H:%M:%S)] === query ${q} ===" | tee -a "${LOG}"
-  "${PY}" "${ROOT}/duckdb/run_tpch_duckdb.py" \
+  limit=()
+  [ "${QUERY_TIMEOUT}" -gt 0 ] && limit=(timeout --kill-after=10 "${QUERY_TIMEOUT}")
+  tstart=$(date +%s)
+  ${limit[@]+"${limit[@]}"} "${PY}" "${ROOT}/duckdb/run_tpch_duckdb.py" \
     "${TPCH_PARQUET}" "${STREAM}" "${OUT_CSV}" "${q}" append 2>&1 | tee -a "${LOG}"
   rc=${PIPESTATUS[0]}
+  el=$(( $(date +%s) - tstart ))
+  # timeout exits 124, or 137 when it had to SIGKILL; a 137 before the limit
+  # is another SIGKILL (the OOM killer), a FAIL below.
+  if [ "${QUERY_TIMEOUT}" -gt 0 ] && { [ "${rc}" = 124 ] \
+       || { [ "${rc}" = 137 ] && [ "${el}" -ge "${QUERY_TIMEOUT}" ]; }; }; then
+    echo "query${q},TIMEOUT,${el},exceeded_query_timeout_${QUERY_TIMEOUT}s" \
+      | tee -a "${OUT_CSV}" "${LOG}"
+    continue
+  fi
   # A process that died without a row is FAIL: the merge replaces rows by
   # query, so the query's earlier row must not stay.
   grep -q "^query${q}," "${OUT_CSV}" \

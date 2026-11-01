@@ -11,6 +11,8 @@ import duckdb
 
 csv = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                                            "all_results.csv")
+if not os.path.exists(csv):
+    sys.exit(f"no results yet: {csv} (make bench or E1 writes it; it is never committed)")
 con = duckdb.connect()
 con.execute(f"CREATE VIEW r AS SELECT * FROM read_csv('{csv}', all_varchar=true)")
 con.sql("""SELECT engine, scale_factor::INT AS sf, count(*) FILTER (status = 'OK') AS ok,

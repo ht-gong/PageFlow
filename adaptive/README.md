@@ -1,4 +1,4 @@
-# `adaptive/` — runtime feedback planes for TQP-Vortex
+# `adaptive/` — runtime feedback planes for PageFlow
 
 This directory holds the engine's runtime decision logic: code that watches a
 running pipeline's measured per-tick timings and arena usage and retunes the
@@ -35,9 +35,7 @@ observer call, pick actuation, sizing samples and re-cuts),
 and `IO/data_scanner.py` (the static settings in
 `instage_optimization`), and `main.py`, which installs everything from the CLI.
 `sizing_resolver.py` at the repo root is the sizing plane's actuation channel,
-and the operators call it for their budgets. Design notes:
-`docs/adaptive_compression_switching.md` and
-`docs/adaptive_intermediate_sizing.md`.
+and the operators call it for their budgets.
 
 ## The compression plane
 
@@ -164,7 +162,7 @@ that writes overrides or decisions. The plane has two legs:
     `c0`) until the transient per byte it measured there fits the budget.
   - A pipe that may be re-cut mid-run (sort, filter and project by class,
     aggregation pass 1 per pipe; uniform geometry) gets a `TickJumpSession`,
-    the learned jump (`docs/adaptive_intermediate_sizing.md` §8): on its
+    the learned jump: on its
     event-ordered ticks it measures `samples` chunks at a size (tick time,
     input bytes, transient), doubles once (the walk), then fits the tick
     time as `F + t·x` and moves to the size that minimizes the pipe's time,
@@ -183,7 +181,7 @@ Both legs' budget counts what the cache region could lend: a size over the
 operator space alone runs, its allocations borrowing from the region inside
 the allocator.
 
-The gather leg walks (`docs/adaptive_intermediate_sizing.md` §6):
+The gather leg walks:
 
 ```
 SENSE   small δ probes (default 64 MB), downward before upward: c0−δ, c0
@@ -304,16 +302,13 @@ a probe window.
 - **Gather windows** change only between gather iterations, each of which is
   internally synchronized.
 
-Where the code falls short of these rules, and of the rest of this README, is
-tracked in `docs/bug_backlog.md`.
-
 ## Files
 
 | File | Purpose |
 |------|---------|
 | `adaptive_driver.py` | The package's registration point: the process-wide hooks the pipeline polls. The tick-observer factory (`set_tick_observer_factory`, `has_tick_observer_factory`, `tick_observer_min_ticks`, `make_tick_observer_for`); the gather-sizing session factory (`set_gather_sizing_factory`, `make_gather_sizing_session`); the tick sizing session factory (`set_tick_sizing_factory`, `has_tick_sizing`, `make_tick_sizing_session`); and the warmup switch `set_gather_sizing_enabled` / `sizing_enabled`, which gates both sizing legs despite its name. Defines the feedback record `GatherIterSample` (one gather iteration: window, rows, CUDA-event legs, arena peak and entry, host-bracketed `iter_ms`). The shipped factories return plain closures. |
-| `decision_menu.py` | The compression plane's boundary objects. `ColumnChoices` is a legal range of one or two codecs (at most one non-RAW) plus RAW and stored bytes; `DecisionMenu` is a pipe's input and output ranges and `total_ticks`; `PickPair` is the `read-and-write` return (input picks, output picks, `seal`). `build_input_choices` builds a range from the reps a column holds and `build_output_choices` from the resolved codec; with `locked=True` it makes the non-base slots of a B-partitioned slot group singletons, so the group flips together. `validate_pick_vector` rejects a wrong-length or out-of-range vector before any state changes. `PickState` is used only by `tests/adaptive/test_menu_surface.py`; the pipeline keeps its own live pick list. |
-| `resource_monitor.py` | `TransferTimes` (per-tick h2d, d2d and d2h ms) and `ComputeTimes` (the compute bracket, and inside it the output-compress span). `do_exchange` builds one `ResourceMonitor` per pipe run; it accumulates whole-pipe averages (`get_trans_t`, `get_comp_t`) and keeps the last tick as the observer's view, with `f_last` as the objective. Under `read-and-write` the pipeline also wires in live per-output-slot raw and stored byte counters, the write search's readback-price inputs. |
+| `decision_menu.py` | The compression plane's boundary objects. `ColumnChoices` is a legal range of one or two codecs (at most one non-RAW) plus RAW and stored bytes; `DecisionMenu` is a pipe's input and output ranges and `total_ticks`; `PickPair` is the `read-and-write` return (input picks, output picks, `seal`). `build_input_choices` builds a range from the reps a column holds and `build_output_choices` from the resolved codec; with `locked=True` it makes the non-base slots of a B-partitioned slot group singletons, so the group flips together. `validate_pick_vector` rejects a wrong-length or out-of-range vector before any state changes. Nothing uses `PickState` since its test was deleted; the pipeline keeps its own live pick list. |
+| `resource_monitor.py` | `TransferTimes` (per-tick h2d, d2d and d2h ms) and `ComputeTimes` (the compute bracket, and inside it the output-compress span). `do_exchange` builds one `ResourceMonitor` per pipe run; it keeps the last tick's transfer and compute times as the observer's view, with `f_last` as the objective. Under `read-and-write` the pipeline also wires in live per-output-slot raw and stored byte counters, the write search's readback-price inputs. |
 | `compression_controller.py` | `CompressionController`, a stateless view over one menu. The decision columns are the two-entry ranges; `benefit(i) = raw_bytes − stored_bytes[candidate]`; `ranked_indices()` orders them highest benefit first, position as tiebreak; `pick_vector(k)` compresses the top *k* and sets the other decision columns RAW. Write-leg counterparts: `write_decision_indices`, `ranked_write_indices(weights)` (weights are measured output bytes) and `write_pick_vector(k, ranked)`. |
 | `compression_search.py` | The search math and the drivers. `ternary_argmin_gen` is integer ternary search over `k ∈ [0, n]` as a generator (memoized, ties to the smaller *k*), with `argmin_unimodal` and `max_evaluations`; `min_searchable_ticks` and `min_write_searchable_ticks` are the minimum pipe lengths `main.py` passes to the factory. `CompressionSearchDriver` is the read leg: two samples per *k*, their median, attribution under the *t+2* lag, epilogue drain ticks ignored. `WriteWindowSearchDriver` is the write leg (see above). `ReadWriteSearchDriver` runs the two in sequence and budgets the write leg from its actual start tick. |
 | `run_stats.py` | Per-query perf-report records, reset by `main.py` at the top of every query; experiment telemetry, kept only under `TQP_EXPERIMENT_TELEMETRY` (the sizing controller and `main.py`'s search factories test the switch before recording; no decision reads them). Sizing-model samples (one predicted-vs-observed transient per sizing decision, capped at 20,000, plus skip counters the gather leg uses) become the `sizing_model` section. The compression-search registry becomes the `compression` section through `snapshot_compression_choices()`: per searched pipe, the menus, *k\**, which gates fired, the probes spent and the final codec vectors. Recorders never raise. |
@@ -344,8 +339,7 @@ consumer imports the module it needs.
 
 ## Known gaps
 
-Open issues in both planes are tracked in `docs/bug_backlog.md`. The gaps
-below are specific to this package's settings and docs.
+The gaps in this package's settings and docs:
 
 - `instage_optimization.py`'s comments name a `--fixed_compression` flag (the
   flag is `--compression`).

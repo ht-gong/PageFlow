@@ -74,7 +74,7 @@ help:
 # profiling/results is created here so Docker never creates it root-owned;
 # every engine service mounts it (read-only) for the codec map.
 dirs:
-	@mkdir -p out profiling/results
+	@mkdir -p out profiling/results experiments/paper_scripts/results
 
 # The data root, for the services that mount it; created here for the same
 # reason (make data writes into it as the host user).
@@ -83,7 +83,8 @@ data-dir: dirs
 	@mkdir -p "$(TQP_DATA_DIR)"
 
 build:
-	$(COMPOSE) --profile run build engine
+	$(COMPOSE) --profile run build --build-arg \
+	  TQP_COMMIT="$$(git rev-parse --short HEAD)$$(git diff --quiet HEAD -- . ':!experiments' || echo +dirty)" engine
 
 doctor: data-dir
 	$(RUN) -e TQP_SKIP_PREFLIGHT=1 engine python3 docker/preflight.py

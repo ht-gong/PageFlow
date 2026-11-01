@@ -45,10 +45,6 @@ baselines/
 bench/
 local.env*
 
-# Design notes, plans and studies. Nothing in this image reads them, and an
-# edit there would otherwise invalidate `COPY . .` and recompile the engine
-# (make bench runs make build first).
-docs/
 
 # Docker's own files are not needed inside the image.
 Dockerfile

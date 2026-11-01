@@ -1,14 +1,18 @@
-# TQP-Vortex
+# PageFlow
 
 Tensor Query Processing on a single GPU. TPC-H queries are compiled from Spark
 plans into dataflow graphs and executed as PyTorch tensor programs; the
 compressed CPU→GPU transfer path — paging, caching, nvCOMP codecs, and the
 runtime controllers that tune them — is what the system optimizes.
 
+PageFlow is the system's name. The repository, its paths, the Docker images
+and the code's identifiers (the `tqp_vortex` engine key in the result tables,
+the `TQP_*` variables, `TQPlib`) keep its earlier name, TQP-Vortex.
+
 The repo has two halves: the engine, at the root, and `baselines/`, the engine
 comparison. In its own Docker image, `baselines/` makes the TPC-H data and runs
 the 22 queries on four other engines (Spark-RAPIDS, cudf-polars, DuckDB,
-Sirius). The root's `make bench` adds TQP-Vortex as the fifth, on the same data,
+Sirius). The root's `make bench` adds PageFlow as the fifth, on the same data,
 through `bench/run_tqp.sh`. Every engine's per-query times go into one table,
 `baselines/results/all_results.csv`. `baselines/README.md` and
 `baselines/AGENTS.md` describe the comparison.
@@ -36,10 +40,10 @@ TQP-Vortex/
 ├── TQPlib/               compiled C++/CUDA extensions install here
 │
 ├── profiling/            the offline codec sweep -> profiling/results/codec_map.json
-├── tests/  experiments/  docs/  utility/
+├── tests/  experiments/  utility/
 ├── Makefile  Dockerfile  docker-compose.yml  docker/
 ├── local.env.example     box settings for both halves; copy to local.env
-├── bench/run_tqp.sh      TQP-Vortex's runner in the engine comparison
+├── bench/run_tqp.sh      PageFlow's runner in the engine comparison
 ├── baselines/            the engine comparison and the TPC-H data (own image)
 └── AGENTS.md             operating rules — read before any perf claim
 ```
@@ -96,7 +100,7 @@ Spark. See `parsing/README.md` for why capture is pinned to one pyspark version.
 
 ## The data and the engine comparison
 
-Every dataset comes from `baselines/`, in its image. TQP-Vortex's scan reads
+Every dataset comes from `baselines/`, in its image. PageFlow's scan reads
 the same validated parquet the other engines read, decoding it on the GPU with
 cuDF (`IO/parquet_reader.py`).
 
@@ -104,7 +108,7 @@ cuDF (`IO/parquet_reader.py`).
 make data SF=N    [baselines image]  ndsgen (TPC-H, NDS-H format) -> $DATA_DIR/sfN/parquet (validated)
 make bench SF=N   per SF, on GPU $GPU:
                   [baselines image]  rapids, polars_gpu, duckdb_cpu, sirius on a ramdisk copy
-                                     of the parquet, freed before TQP-Vortex runs
+                                     of the parquet, freed before PageFlow runs
                   [engine image]     bench/run_tqp.sh: one main.py --SF N --q <q> per query
                                      on $DATA_DIR/sfN/parquet
                   -> baselines/results/all_results.csv, one row per (engine, SF, query)
@@ -226,24 +230,54 @@ per-codec chunk size that `compression/format_policy.py` loads at startup.
 Needs the SF5 parquet (`make data SF=5`); without the file the engine runs on
 its built-in defaults and says so.
 
-**Experiments and figures.** `experiments/paper_scripts/` holds the paper's
-ablation (`e6_ablation.py`) and figures (`figures/`);
-`experiments/self-verification/` holds the drivers that check a change:
-end-to-end speedup and a time breakdown (AGENTS.md, "Experiments"). The
-drivers run on the host and take their GPU and data root as the Makefile does
-(`TQP_GPU`/`GPU`, `TQP_DATA_DIR`/`$DATA_DIR`, from `local.env`):
+**Experiments and figures.** `experiments/self-verification/` holds the
+drivers that check a change: end-to-end speedup and a time breakdown.
+`experiments/paper_scripts/` holds the paper's experiment drivers (E1, E2, E3, E4)
+and, in `figures/`, the scripts that draw its figures and tables from their
+outputs (AGENTS.md, "Experiments"). The drivers run on the host and
+take their GPU and data root as the Makefile does (`TQP_GPU`/`GPU`,
+`TQP_DATA_DIR`/`$DATA_DIR`, from `local.env`; E1, like `make bench`'s
+baselines, only `GPU` and `DATA_DIR`):
 
 ```bash
 python3 experiments/self-verification/e2_speedup.py --help
-make experiments SCRIPT=experiments/paper_scripts/figures/scaling_study.py
+python3 experiments/paper_scripts/e2_end_to_end_ablation.py --show
 ```
 
-Under Docker these need `requirements-dev.txt` (matplotlib, numpy), which the
-engine image already installs. Design notes and findings live in `docs/`.
+**Results are never committed.** No timing or measurement file is in git.
+Every number a figure or table draws is read, when it is drawn, from a file a
+driver wrote on the box that ran it; no script carries a measured number in its
+source. What writes what (AGENTS.md, "Results are never committed", has the
+default paths and flags):
 
-**Older numbers are stale.** TQP-Vortex numbers from a tree without
-`baselines/`, such as the experiment outputs and the findings in `docs/`
-measured there, do not compare with runs on this tree, whatever data they
+| Run | Writes | Read by |
+|---|---|---|
+| `make bench SF=<sf>` | `baselines/results/all_results.csv` | `make summary` (no figure reads its `tqp_vortex` rows; at SF100 and above its `polars_gpu`, `rapids` and `duckdb_cpu` rows replace E1's) |
+| E1, `e1_motivation.py` | `baselines/results/all_results.csv` (the four baseline engines at SF30-1000, Sirius host-pinned) | `make_motivation_geomean_fig.py` (the intro figure), `make_baselines_fig.py` and `make_scaling_fig.py` (the baselines) |
+| `make spill SF=<sf>` | `baselines/results/spill_profile.csv`, `$SPILL_ROOT/sf<sf>/<engine>/records.jsonl` | `make_spill_fig.py`, `make_intermediates_fig.py`, `make_offgpu_table.py` |
+| E2, `e2_end_to_end_ablation.py` | `experiments/paper_scripts/results/ablation_results.csv` | `make_ablation_fig.py`, `make_baselines_fig.py` and `make_scaling_fig.py` (PageFlow) |
+| E3, `e3_allocation_ablation.py` | `experiments/paper_scripts/results/allocation_ablation_results.csv` | `make_allocation_fig.py` |
+| E4, `e4_ablation_profile.py` | `experiments/paper_scripts/results/ablation_profile.csv` | `make_ablation_fig.py`, `make_query_breakdown_fig.py` |
+| `make profiling` | `profiling/results/` (the codec map, the sweep CSVs) | the engine, `make_regret_fig.py` |
+
+Four figure inputs have no producer on main: `make_transfer_fig.py`'s per-GPU
+RAW-vs-adaptive CSVs, `make_offgpu_table.py`'s PageFlow RAW and adaptive spill
+records, the Sirius intermediate split (`--sirius-split`) and the cudf-Polars
+intermediates estimate (`--polars`, drawn as "est."). AGENTS.md says what each
+must hold.
+
+The drivers and figure scripts run with Docker (`make experiments
+SCRIPT=<path> ARGS="…"`; E1 and the self-verification drivers start their own
+containers) or without it (`bench/native_env.sh`'s venv); AGENTS.md,
+"Experiments", has the command for each. The figures need
+`requirements-dev.txt` and the Linux Biolinum font, which the engine image
+has. The design notes, plans and studies that were in `docs/` are in the
+history: `git ls-tree --name-only 5d5c441 docs/` lists them and `git show
+5d5c441:docs/<file>.md` prints one.
+
+**Older numbers are stale.** PageFlow numbers from a tree without
+`baselines/`, such as the experiment outputs and the studies that were in
+`docs/`, do not compare with runs on this tree, whatever data they
 used. On those trees q11 ran without its HAVING filter, q16 counted duplicate
 suppliers (since July 2025), q20 ran another plan, and primary keys were typed
 sorted, which can change their codecs. Most of those runs also used the
@@ -277,9 +311,7 @@ free (`memory/README.md`, "Lending").
 `resource_monitor.py` produces the per-tick transfer/compute split both planes
 consume; `run_stats.py` folds predicted-vs-observed into the perf report (under
 `TQP_EXPERIMENT_TELEMETRY`).
-Design notes: `docs/adaptive_compression_switching.md` and
-`docs/adaptive_intermediate_sizing.md`; `adaptive/README.md` has the per-file
-tour, and open issues are in `docs/bug_backlog.md`.
+`adaptive/README.md` describes both planes and has the per-file tour.
 
 ### `compression/` — nvCOMP codecs and format policy
 

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Where each hot query's timed window goes, from one Nsight trace taken with
-``nvtx_ranges.py`` (E5; docs/sf100-bottleneck-study.md §1.4).  Runs on the
+``nvtx_ranges.py`` (E5).  Runs on the
 host (sqlite3 only); export the trace first with ``nsys export --type sqlite``.
 
-  [EXCLUDE_Q=1,..] [ONLY_Q=7,..] [ONLY_ARM=<arm>] [HOT_FROM=1] [BEFORE=<json>] \\
+  [ONLY_ARM=<arm>] [BEFORE=<json>] \\
       trace_analyze.py <trace.sqlite> <out.json> [<perf dir>]
 
-HOT_FROM: the first occurrence index analysed per qid (default 1: skip the
-cold one; 0 for a single cold pass).  ONLY_ARM: keep the windows inside one
+Each qid's first occurrence is its cold one and is left out (its window is
+reported as W_cold).  ONLY_ARM: keep the windows inside one
 "ARM <arm>" range (``switch_ab.py --nvtx`` marks every occurrence with its
 arm).  <perf dir>: a ``--perf_report`` directory whose ``query_times.csv``
 gives each query's untraced time (``T_canon``: the median of its occurrences
@@ -212,7 +212,6 @@ K = IvSet([(s, e) for s, e, *_ in kern])
 BUSY = IvSet([(s, e) for s, e, *_ in kern] + [(s, e) for s, e, *_ in copies] + list(msets))
 H2D = IvSet([(s, e) for s, e, b, k, *_ in copies if k == 1])
 D2H = IvSet([(s, e) for s, e, b, k, *_ in copies if k == 2])
-busy_iv = list(zip(BUSY.s, BUSY.e))
 # Copy-only time split by direction: D2H with no kernel and no H2D running,
 # H2D with no kernel and no D2H, and both directions at once.
 _kh = IvSet([(s, e) for s, e, *_ in kern] + list(zip(H2D.s, H2D.e)))
@@ -236,9 +235,9 @@ for s, e, name, _ in qranges:
     w1 = outs[-1][0] if outs else e
     windows.append((q, k_, s, w1))
 
-# chunk_ab.py wraps every occurrence in an "ARM <name>" range; ONLY_ARM keeps
-# the windows of one arm (the first, warm occurrence of each qid is still
-# dropped as cold; with HOT_FROM=0 it is kept, for its own arm only).
+# switch_ab.py --nvtx wraps every occurrence in an "ARM <name>" range;
+# ONLY_ARM keeps the windows of one arm (the first, warm occurrence of each
+# qid is still dropped as cold).
 _arm_ranges = [(s, e, t[4:]) for s, e, t, _ in nv if t.startswith("ARM ")]
 
 
@@ -265,16 +264,11 @@ copy_starts = [x[0] for x in copies]
 max_kd = max((e - s for s, e, *_ in kern), default=0)
 max_cd = max((e - s for s, e, *_ in copies), default=0)
 
-_excl = {int(x) for x in os.environ.get("EXCLUDE_Q", "").split(",") if x}
-_only = {int(x) for x in os.environ.get("ONLY_Q", "").split(",") if x}
 _only_arm = os.environ.get("ONLY_ARM")
 for q, k_, w0, w1 in windows:
-    if q in _excl or (_only and q not in _only):
+    if _only_arm and k_ > 0 and arm_of(w0) != _only_arm:
         continue
-    if (_only_arm and (k_ > 0 or os.environ.get("HOT_FROM") == "0")
-            and arm_of(w0) != _only_arm):
-        continue
-    if k_ < int(os.environ.get("HOT_FROM", "1")):
+    if k_ < 1:
         cold[q] = (w1 - w0) / 1e9
         continue
     lo = bisect.bisect_left(nv_starts, w0)

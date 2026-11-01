@@ -201,3 +201,41 @@ def test_uva_bytes_bounds():
     # sectors when each window is dense.
     assert uva_bytes(n, 2 * n, n, 8) == pytest.approx(
         2 * uva_bytes(n, n, n, 8), rel=1e-6)
+
+
+@requires_cuda
+@pytest.mark.parametrize("n_out,windows", [(3 << 19, 3), (1 << 12, 1)])
+def test_a_compressed_index_over_a_chunk_is_decoded_by_window(
+        cuda_allocator, pool, engine, monkeypatch, n_out, windows):
+    """A compressed index larger than the chunk budget is read and decoded
+    a window of whole records at a time into its one buffer
+    (``col_to_gpu_windowed``), never whole beside its compressed bytes; a
+    smaller one is one ``col_to_gpu``.  The gather's rows are the same
+    either way, nulls included."""
+    from IO.pipeline import common
+    from IO.pipeline import rearrange_pipeline as rp_mod
+    # One record per window: 4 MiB, the record cap (2^19 int64 rows).
+    monkeypatch.setattr(constants, "get_chunk_size_b", lambda: 4 << 20)
+    monkeypatch.setattr(rp_mod, "uva_bytes", lambda *a: 0)
+    x = torch.randint(0, 1 << 30, (1 << 16, 1), dtype=torch.int64,
+                      generator=torch.Generator().manual_seed(11))
+    g = torch.Generator().manual_seed(12)
+    idx = torch.randint(0, x.shape[0], (n_out,), dtype=torch.int64,
+                        generator=g)
+    idx[torch.randperm(n_out, generator=g)[:n_out // 7]] = constants.null
+    idx_ccr = _column(pool, idx.unsqueeze(1), "int", ["ANS"])
+    loads = []
+    real = common.col_to_gpu
+    monkeypatch.setattr(common, "col_to_gpu",
+                        lambda ccr: loads.append(ccr.col_length())
+                        or real(ccr))
+    reads = _Reads(monkeypatch)
+    node = _gather_node(_column(pool, x, "int", ["RAW", "ANS"]), idx_ccr)
+    rp_mod.rearrange_pipeline(node, pool, "right-outer",
+                              applier=_FixedCodec("ANS"))
+    index_loads = list(loads)   # ``_host`` below reads with col_to_gpu too
+    got = _host(node.outputs[0].ccr.reps[0]).reshape(-1, 1)
+    assert torch.equal(got, _expected(x, idx).reshape(-1, 1))
+    assert reads.uva > 0 and not reads.pipes
+    assert len(index_loads) == windows and sum(index_loads) == n_out
+    assert max(index_loads) <= (4 << 20) // 8

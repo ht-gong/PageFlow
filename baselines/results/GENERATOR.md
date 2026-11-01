@@ -3,7 +3,7 @@
 **Invariant: every engine runs the same rows, produced by the NDS-H
 generator.** A cross-engine number is only meaningful if all engines read the
 same data; each baseline engine reads it in the per-column format its
-profiling map chose (`AGENTS.md`, "Before every benchmark"), and TQP-Vortex,
+profiling map chose (`AGENTS.md`, "Before every benchmark"), and PageFlow,
 which converts columns into its own format, reads any of them. This document defines the one allowed generator, records a
 provenance audit that found the invariant had been violated, and gives the guard
 (`validate_dataset.py`) that now enforces it.
@@ -35,7 +35,7 @@ exports (writer `cudf …`). Self-generated data is not comparable to the extern
 standard and has produced materially different query results (below). Do not
 point a runner at self-written parquet, even as a convenience.
 
-TQP-Vortex (`tqp_vortex`) has no generator of its own: it reads this parquet.
+PageFlow (`tqp_vortex`) has no generator of its own: it reads this parquet.
 
 ## Provenance audit (2026-07-25)
 

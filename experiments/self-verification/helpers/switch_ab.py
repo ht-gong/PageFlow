@@ -2,8 +2,7 @@
 """In-process A/B over engine switches (E2's ``switches`` mode, E5's arms):
 the arms alternate per query occurrence inside one ``main.py`` process, so
 every arm is measured seconds from the others and the shared host's load
-drift cancels (docs/sf100-bottleneck-study.md §1.6, §6).  Runs inside the
-``dev`` container.
+drift cancels.  Runs inside the ``dev`` container.
 
 A switch is a module global that the engine sets once, at import, from its
 environment variable and reads through its module at each use, e.g.

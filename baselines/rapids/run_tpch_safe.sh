@@ -107,6 +107,8 @@ for q in ${QUERIES}; do
     stats_env=(RAPIDS_STATS_DIR="${sdir}")
   fi
   log "=== query ${q} starting (free $(free_gb)GB) ==="
+  # Only rows after this line are this run's: QUERIES may repeat a query.
+  n0=$(wc -l < "${OUT_CSV}")
   env -u CONTAINER_ID "${stats_env[@]}" spark-submit "${RAPIDS_RUN_ARGS[@]}" "${extra[@]}" \
     "${RAPIDS_DIR}/run_tpch_queries.py" "${RAM_PQ}" "${STREAM}" "${OUT_CSV}" "${q}" append \
     >"${qlog}" 2>&1 &
@@ -134,7 +136,7 @@ for q in ${QUERIES}; do
     echo "query${q},KILLED_DISK,NA,0,exceeded_disk_scratch_on_single_GPU" >> "${OUT_CSV}"
     log "    query ${q}: KILLED (disk). result line recorded."
   elif [ "${timedout}" = 1 ]; then
-    res=$(grep -E "^query${q}[, ]" "${OUT_CSV}" | tail -1)
+    res=$(tail -n +"$(( n0 + 1 ))" "${OUT_CSV}" | grep -E "^query${q}[, ]" | tail -1)
     if [ -n "${res}" ]; then
       # The query wrote its row and the limit came during the JVM's shutdown:
       # the row stands.
@@ -144,7 +146,7 @@ for q in ${QUERIES}; do
       log "    query ${q}: TIMEOUT. result line recorded."
     fi
   else
-    res=$(grep -E "^query${q}[, ]" "${OUT_CSV}" | tail -1)
+    res=$(tail -n +"$(( n0 + 1 ))" "${OUT_CSV}" | grep -E "^query${q}[, ]" | tail -1)
     # A process that died without a row is FAIL: the merge replaces rows by
     # query, so the query's earlier row must not stay.
     [ -n "${res}" ] || { res="query${q},FAIL,NA,0,no_result_row_exit_code_${rc}"; echo "${res}" >> "${OUT_CSV}"; }

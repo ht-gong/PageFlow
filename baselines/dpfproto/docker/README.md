@@ -14,7 +14,7 @@ instructions below; Docker mounts that data and does not generate it.
 ### Get DPFProto
 
 Clone upstream DPFProto at the commit the patch is based on, then apply
-`dpfproto/patches/golap-baseline.patch`. From the TQP-Vortex root:
+`dpfproto/patches/golap-baseline.patch`. From the repository root:
 
 ```bash
 git clone --recursive https://github.com/dbc-utokyoiis/DPFProto.git baselines/dpfproto/DPFProto

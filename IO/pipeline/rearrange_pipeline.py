@@ -13,7 +13,7 @@ from adaptive.adaptive_driver import (
 )
 import sizing_resolver
 import TQPlib.tqpmemory as cmp
-from IO.pipeline.common import _WindowPeakTracker, col_to_gpu
+from IO.pipeline.common import _WindowPeakTracker, col_to_gpu_windowed
 from IO.telemetry import gates, movement
 from IO.pages import device_regions
 
@@ -492,9 +492,13 @@ def rearrange_pipeline(
     if to_gather:
         # Each column's chunks as host regions: the granule cache does not
         # hold a gather's outputs.
-        # Decompress + H2D the index once; the gather requires a 1-D int64
+        # The index on the GPU once; the gather requires a 1-D int64
         # tensor (it argsorts along the last dim).
-        idx = col_to_gpu(index.ccr).long().reshape(-1)
+        # A compressed index over the chunk budget is decoded window by
+        # window (col_to_gpu_windowed): whole, Q7's at SF1000 is 7.5 GB of
+        # ANS beside 13.9 GB decoded, both contiguous, and the lend for the
+        # decoded buffer comes up short.
+        idx = col_to_gpu_windowed(index.ccr).long().reshape(-1)
         has_null = None
         # One peak tracker for the whole pipe: per-iteration brackets (gather
         # sizing feedback) and the streamed loads compose into the

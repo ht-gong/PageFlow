@@ -9,10 +9,14 @@ dpfproto/logs/
 
 .venv/
 
-# ---- benchmark intermediates: results/all_results.csv is the ONLY kept TPC-H
-# results file; every per-run / per-SF / detail CSV is a throwaway (runners merge
-# into all_results.csv via merge_results.py and delete their temp). The format
-# profiling pass keeps results/format_profile.csv and results/format_map.json.
+# ---- results are never committed (AGENTS.md, "Results are never committed").
+# results/all_results.csv (merge_results.py), results/spill_profile.csv (the
+# spill pass), results/format_profile.csv and results/format_map.json (the format
+# profiling pass) are written on the box that ran them and read from there; every
+# per-run / per-SF / detail CSV is a throwaway.
+results/*.csv
+results/*.json
+results/*.jsonl
 results/query_times_*.csv
 results/*_logs/
 **/_raw/

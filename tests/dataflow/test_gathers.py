@@ -1,4 +1,4 @@
-"""Gathers are nodes (B3 of docs/materialization_unification_plan.md).
+"""Gathers are nodes.
 
 CPU-only, over the 22 prepared plans, deferral on and off: the builder's
 three invariants hold (each gather is the last consumer of its sources; no

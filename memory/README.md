@@ -1,4 +1,4 @@
-# `memory/` — the GPU arena allocator for TQP-Vortex
+# `memory/` — the GPU arena allocator for PageFlow
 
 This directory holds the pooled CUDA allocator that PyTorch runs on inside the
 engine, plus the pinned-host allocation primitive the scan path pins its data
@@ -58,7 +58,7 @@ runs exercise it end to end, and `tests/page_cache/test_cache_region.py` the
 engine's `CacheRegion` over it. `tests/allocator/test_slot_pool_blocks.py`
 covers the reference model's slot pool, not this code.
 The arena-stats getter (`get_arena_stats`) feeds the sizing plane's memory
-model (`docs/adaptive_intermediate_sizing.md`).
+model (`adaptive/README.md`).
 
 ## How the pool works
 

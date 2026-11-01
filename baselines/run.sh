@@ -24,6 +24,8 @@
 #             Default: "rapids polars_gpu duckdb_cpu sirius"
 #             Resident mode (data loaded before the timed run; AGENTS.md):
 #             duckdb_cpu_resident polars_gpu_resident sirius_resident rapids_resident
+#             sirius_host: the second Sirius build (SIRIUS_HOST_REF) with the
+#             query's columns pinned in its host tier (AGENTS.md)
 #   DATA_DIR  where datasets live on disk, as $DATA_DIR/sf<SF>/parquet/<table>/
 #             (required). Missing datasets are generated here.
 #   SCRATCH   engine scratch root (required; runners use $SCRATCH/<engine>).
@@ -50,7 +52,8 @@
 #             is 1 unless every record and identity holds (`make spill-smoke`).
 #             RUN_CSV_DIR is ignored.
 # The tool paths (PY, POLARS_PY, JAVA_HOME, SPARK_HOME, RAPIDS_JAR,
-# SIRIUS_DUCKDB, SIRIUS_ENVLIB, NDSGEN) come from the image.
+# SIRIUS_DUCKDB, SIRIUS_ENVLIB, SIRIUS_HOST_DUCKDB, SIRIUS_HOST_ENVLIB, NDSGEN)
+# come from the image.
 #
 # Examples:
 #   ./run.sh                       # all four engines, SF30..SF700 (normally: make bench)
@@ -64,6 +67,11 @@ SHM="${SHM:-/dev/shm}"
 DATA_DIR="${DATA_DIR:?DATA_DIR is not set}"
 : "${SCRATCH:?SCRATCH is not set}" "${PY:?PY is not set}"
 ENGINES="${ENGINES:-rapids polars_gpu duckdb_cpu sirius}"
+# sirius_host's build, checked before any SF is staged: under set -u an unset
+# path would end the run mid-SF, its staged copies left in ${SHM}.
+case " ${ENGINES} " in *" sirius_host "*)
+  : "${SIRIUS_HOST_DUCKDB:?SIRIUS_HOST_DUCKDB is not set}" "${SIRIUS_HOST_ENVLIB:?SIRIUS_HOST_ENVLIB is not set}" ;;
+esac
 QUERIES="${QUERIES:-$(seq 1 22)}"
 CANON_SFS="30 50 100 300 500 700"
 
@@ -150,6 +158,11 @@ run_engine(){   # $1=engine  $2=ramdisk_parquet  $3=SF
     polars_gpu_resident)  env "${smoke[@]}" LOAD_MODE=resident ENGINE_KEY="${e}" TPCH_PARQUET="${pq}" TPCH_SF="${sf}" bash "${REPO}/polars/run_polars_gpu.sh" "${QUERIES}" ;;
     sirius_resident)      env "${smoke[@]}" LOAD_MODE=resident ENGINE_KEY="${e}" SIRIUS_PARQUET="${pq}" TPCH_SF="${sf}" bash "${REPO}/sirius/run_sirius.sh" "${QUERIES}" ;;
     rapids_resident)      env "${smoke[@]}" LOAD_MODE=resident ENGINE_KEY="${e}" TPCH_PARQUET="${pq}" TPCH_SF="${sf}" bash "${REPO}/rapids/run_tpch_safe.sh" "${QUERIES}" ;;
+    # The paper figures' Sirius: the second build, pinned in its host tier.
+    sirius_host)          env "${smoke[@]}" LOAD_MODE=resident SIRIUS_PIN_TIER=host ENGINE_KEY="${e}" \
+                              SIRIUS_DUCKDB="${SIRIUS_HOST_DUCKDB}" SIRIUS_ENVLIB="${SIRIUS_HOST_ENVLIB}" \
+                              SIRIUS_CONFIG_FILE="${REPO}/sirius/sirius_host.yaml" \
+                              SIRIUS_PARQUET="${pq}" TPCH_SF="${sf}" bash "${REPO}/sirius/run_sirius.sh" "${QUERIES}" ;;
     *) log "    unknown engine '${e}'"; return 1 ;;
   esac
 }

@@ -95,7 +95,6 @@ def test_the_output_step_is_its_own_phase(ledger):
 
 def test_perf_json_kinds_match_the_ledger():
     assert perf_json.KINDS == movement.KINDS
-    assert perf_json.SPILL_KINDS == movement.SPILL_KINDS
     assert set(perf_json.OUT_KINDS) <= set(movement.KINDS)
 
 
@@ -104,9 +103,7 @@ def test_perf_json_reads_the_ledger_strictly(ledger, tmp_path):
     movement.record("spill_bypass", 1, 30, 10)
     movement.record("spill_mirror", 1, 8, 5)
     perf = {"wall": {"approx_time": 1.5}, "movement": movement.report()}
-    assert perf_json.approx_time(perf) == 1.5
     assert perf_json.born(perf) == 110
-    assert perf_json.spill_total(perf) == 15
     assert perf_json.mv(perf, "result_d2h", "pages", phase="output") == 0
     with pytest.raises(KeyError):
         perf_json.mv(perf, "no_such_kind", "pages")

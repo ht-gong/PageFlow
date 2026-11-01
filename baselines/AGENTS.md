@@ -10,12 +10,13 @@ results-data contract.
 Every workflow runs in one pinned Docker image through `make`; each target calls
 `docker/run.sh`, which mounts the repo, `DATA_DIR` and `SCRATCH` at their host
 paths and runs the target's script inside. Box settings (`DATA_DIR`, `SCRATCH`,
-`SHM`, `GPU`) come from the environment or `local.env` at the TQP-Vortex root,
+`SHM`, `GPU`) come from the environment or `local.env` at the repository root,
 `../local.env` (copy `../local.env.example`).
 
 ```bash
 make image && make doctor            # once per pin change; doctor checks GPU, io_uring, versions
 make data SF=100                     # generate (if missing) + validate $DATA_DIR/sf100
+make engine-data CMD="make sirius 30"  # one engine's format-map dataset, $DATA_DIR/<engine>/sf<SF> (below)
 make bench SF="100 300" [ENGINES="rapids sirius"] [QUERIES="1 6"]
 make smoke                           # SF1, the four baseline engines, nothing merged; fails unless 22/22 everywhere, with the SF1 reference's row counts
 make ablation [SF=5] [ENCODINGS="plain dict delta"] [COMPRESSIONS="snappy zstd lz4raw"] [ROUNDS=3] [TOL=0.05] [OUT=dir]
@@ -35,7 +36,7 @@ set `{30,50,100,300,500,700}` (`30-300`); `ENGINES` defaults to
 `KEEP_RAMDISK`, `GEN_PARALLEL`, `GEN_BATCH`, `GEN_OPTS`, `DRIVER_MEM`, `GPU_PART_MB`,
 `MIN_FREE_GB`, timeouts, …) are listed in `docker/run.sh`.
 
-At the TQP-Vortex root, `make bench` adds the fifth engine, `tqp_vortex`, and
+At the repository root, `make bench` adds the fifth engine, `tqp_vortex`, and
 runs all five by default: per SF, `run.sh` for the others, then
 `../bench/run_tqp.sh` on the host. It takes `SF` as bare numbers, and `ENGINES`
 and `QUERIES` as here; a `RUN_CSV_DIR` there must be under `$SCRATCH`, and each
@@ -43,7 +44,8 @@ SF's `results/run.log` is kept as `results/run_sf<SF>.log`. `make smoke-all`
 there is SF1 on all five, nothing merged.
 
 Runners read the tool paths the image sets — `PY`, `POLARS_PY`, `JAVA_HOME`,
-`SPARK_HOME`, `RAPIDS_JAR`, `SIRIUS_DUCKDB`, `SIRIUS_ENVLIB`, `NDSGEN` — and
+`SPARK_HOME`, `RAPIDS_JAR`, `SIRIUS_DUCKDB`, `SIRIUS_ENVLIB`,
+`SIRIUS_HOST_DUCKDB`, `SIRIUS_HOST_ENVLIB`, `NDSGEN` — and
 `SCRATCH` (engine scratch: `$SCRATCH/rapids`, `$SCRATCH/polars`, `$SCRATCH/probe`).
 Nothing in the scripts names a box-specific path.
 
@@ -55,7 +57,7 @@ Nothing in the scripts names a box-specific path.
 | `polars_gpu` (cudf-polars, GPU) | `polars/` | `run_polars_gpu.sh` |
 | `duckdb_cpu` (DuckDB, CPU) | `duckdb/` | `run_duckdb.sh` |
 | `sirius` (Sirius GPU, DuckDB ext.) | `sirius/` | `run_sirius.sh` |
-| `tqp_vortex` (TQP-Vortex, GPU) | `..` (the TQP-Vortex root) | `../bench/run_tqp.sh` (host) |
+| `tqp_vortex` (PageFlow, GPU) | `..` (the repository root) | `../bench/run_tqp.sh` (host) |
 
 Engine settings shared by a runner and the format probes live in
 `rapids/activate.sh` (`rapids_run_args`), `polars/env.sh`, `sirius/env.sh`.
@@ -66,10 +68,10 @@ external file cache off, Sirius's prefetch cache off), RAPIDS temp views over
 `spark.read.parquet`, Polars `scan_parquet`. Sirius must not use `pin_table`: a
 pin decodes the parquet into cuDF columns in pinned memory, so the parquet format
 would no longer reach query time (`sirius/README.md`). DuckDB's in-memory
-`tables` mode was removed. Resident mode, below, is the one exception, under
-its own engine keys.
+`tables` mode was removed. Resident mode and `sirius_host`, below, are the
+exceptions, under their own engine keys.
 
-`tqp_vortex` is TQP-Vortex itself (the repo root), in its own image. It reads
+`tqp_vortex` is PageFlow itself (the repo root), in its own image. It reads
 the same parquet from `$DATA_DIR` on disk and runs its own SQL and plan
 lowering of each query, semantically the stream's. The root `make bench` makes
 the SF's and SF1's datasets (`make data`) first where they are missing, and
@@ -87,7 +89,7 @@ No query runs twice on the target data in one process; repeating a measurement
 means a new process. A query that fails its warm pass is recorded `FAIL` and not
 timed.
 
-`tqp_vortex` keeps TQP-Vortex's own warmup: its SF1 pass runs Q1, then the
+`tqp_vortex` keeps PageFlow's own warmup: its SF1 pass runs Q1, then the
 query, and runs q11 with SF1's FRACTION, where the baselines' warm pass runs the
 target SF's text. Its timer (`approx_time`) has other bounds than the baselines'.
 It starts after the query's columns are read from the parquet on disk, not the
@@ -124,7 +126,10 @@ never replace the parquet rows.
   `raise_on_fail` and an explicit `CudaAsyncMemoryResource` (left unset, that
   executor allocates from a managed-memory pool, which would page the "resident"
   columns out to host): unlike `polars_gpu`, a query whose working set exceeds the
-  GPU fails with an out-of-memory error. The SF1 warm pass records the columns
+  GPU fails with an out-of-memory error. `POLARS_RESIDENT_MR=managed_pool`
+  (default `async`) swaps in a prefetching pool over managed memory instead: such a
+  query then completes, paging to host memory inside the timed run (the setting
+  the motivation figure's rows use, `e1_motivation.py`). The SF1 warm pass records the columns
   the query scans; exactly those target columns are uploaded before the timed
   run, and a timed run that copies any column host→device is `FAIL`
   (`device_cache_miss:<cols>`). The patch checks the cudf-polars version (26.06)
@@ -147,6 +152,19 @@ never replace the parquet rows.
 
 The GPU keys hold only the query's columns: decoded TPC-H is about 1.2 GB per SF,
 so whole datasets fit on a 32 GB GPU at no benchmark SF.
+
+**`sirius_host` — the paper figures' Sirius.** A fifth key, at any SF:
+the second Sirius build in the image (`SIRIUS_HOST_REF` in `versions.env`,
+572fc850, the July 2026 evaluation's; `$SIRIUS_HOST_DUCKDB`,
+`$SIRIUS_HOST_ENVLIB`), run as `sirius_resident` is but with the query's columns
+pinned in Sirius's pinned **host** tier, `CALL pin_table(..., tier='host')`
+(`SIRIUS_PIN_TIER=host`: decoded on the GPU, then copied to pinned host memory),
+so the timed run copies them host→device; the same `pin_not_served` check. Its
+config is `sirius/sirius_host.yaml`, `sirius.yaml` with a 640 GiB host tier
+(the pins of an SF1000 query reach about 252 GB). Its rows are neither the
+parquet `sirius` rows nor the GPU-pinned `sirius_resident` rows, and never
+replace them; `experiments/paper_scripts/e1_motivation.py` runs it at every
+scale factor of its suite, for the motivation, baselines and scaling figures.
 
 The baseline runners read the same `results/queries/stream_qualification.sql`
 and take `TPCH_PARQUET` / `TPCH_SF`; `../bench/run_tqp.sh` converts each
@@ -186,7 +204,7 @@ the external standard and gives different query answers.
 publishes `parquet/` only after it validates. Full rules and rationale:
 `results/GENERATOR.md`.
 
-The one-generator rule covers TQP-Vortex too, which has no generator of its
+The one-generator rule covers PageFlow too, which has no generator of its
 own: it scans the same parquet (`$DATA_DIR`, the root Makefile's default
 `TQP_DATA_DIR`).
 
@@ -194,15 +212,18 @@ own: it scans the same parquet (`$DATA_DIR`, the root Makefile's default
 
 **The single source of truth.** One row per `(engine, scale_factor, query)`.
 Summary / matrices / per-engine scaling are all pivots of this — do NOT add
-parallel summary CSVs; pivot this instead (`make summary`).
+parallel summary CSVs; pivot this instead (`make summary`). It is written on the
+box that ran the engines and never committed, like `spill_profile.csv`,
+`format_profile.csv` and `format_map.json` (the repository root's AGENTS.md,
+"Results are never committed"); `merge_results.py` creates it on the first merge.
 
 | column | type | values / meaning |
 |--------|------|------------------|
-| `engine` | string | `rapids` · `polars_gpu` · `duckdb_cpu` · `sirius` · `tqp_vortex`; resident mode (above): `sirius_resident` · `polars_gpu_resident` · `duckdb_cpu_resident` · `rapids_resident` |
+| `engine` | string | `rapids` · `polars_gpu` · `duckdb_cpu` · `sirius` · `tqp_vortex`; resident mode (above): `sirius_resident` · `polars_gpu_resident` · `duckdb_cpu_resident` · `rapids_resident`; host-pinned Sirius (above): `sirius_host` |
 | `scale_factor` | int | TPC-H scale factor (≈ GB raw) |
 | `query` | string | `query1` … `query22` |
-| `status` | string | `OK` · `FAIL` (engine error; **GPU OOM** shows here with the engine's message in `rows_or_error`: Sirius's "OOM retry limit", TQP-Vortex's "Pool out of memory", or "PinnedPoolExhausted" for its pinned host pool; resident mode: `pin_not_served:…` / `device_cache_miss:…` / `cache_miss:…` when the timed run read data that was not resident) · `KILLED_DISK` (disk-watchdog kill) · `TIMEOUT` (per-query timeout; `rapids`, `rapids_resident`: its process outlived `RAPIDS_TIMEOUT`, default 600 s, or a smaller `QUERY_TIMEOUT`; `tqp_vortex`: its process outlived `TQP_TIMEOUT`) |
-| `seconds` | float | wall-clock of the query's one timed run on the target SF, in its own process after an untimed SF1 warm pass (engine startup excluded; `*_resident`: the data load excluded too); `tqp_vortex`: `approx_time`, within the bounds above; time-to-failure on error; `NA` on a disk-watchdog kill or where no time was taken; on `rapids`' and `polars_gpu`'s `TIMEOUT`, the process's elapsed seconds |
+| `status` | string | `OK` · `FAIL` (engine error; **GPU OOM** shows here with the engine's message in `rows_or_error`: Sirius's "OOM retry limit", PageFlow's "Pool out of memory", or "PinnedPoolExhausted" for its pinned host pool; resident mode: `pin_not_served:…` / `device_cache_miss:…` / `cache_miss:…` when the timed run read data that was not resident) · `KILLED_DISK` (disk-watchdog kill) · `TIMEOUT` (per-query timeout; `rapids`, `rapids_resident`: its process outlived `RAPIDS_TIMEOUT`, default 600 s, or a smaller `QUERY_TIMEOUT`; `tqp_vortex`: its process outlived `TQP_TIMEOUT`) |
+| `seconds` | float | wall-clock of the query's one timed run on the target SF, in its own process after an untimed SF1 warm pass (`experiments/paper_scripts/e1_motivation.py`: the mean of its reps, each such a run in a process of its own; engine startup excluded; `*_resident` and `sirius_host`: the data load excluded too); `tqp_vortex`: `approx_time`, within the bounds above; time-to-failure on error; `NA` on a disk-watchdog kill or where no time was taken; on `rapids`' and `polars_gpu`'s `TIMEOUT`, the process's elapsed seconds |
 | `rows_or_error` | int / string | result **row count** when `OK` (`tqp_vortex` Q16 at SF ≥ 100, whose output step is skipped: its final Sort's rows), else a short error string |
 
 ```csv
@@ -211,9 +232,9 @@ rapids,100,query1,OK,2.308,4
 sirius,500,query9,FAIL,259.488,INTERNAL Error: ... GPU pipeline task exceeded maximum OOM retry limit (100) for
 ```
 
-**Formerly wrong `tqp_vortex` values.** Until 2026-10-14 TQP-Vortex's
-aggregate added up per-chunk ratios where it should have merged partial sums
-(`../docs/bug_backlog.md`, "Query results"): from about SF88 up, at the
+**Formerly wrong `tqp_vortex` values.** Until 2026-10-14 PageFlow's
+aggregate added up per-chunk ratios where it should have merged partial sums:
+from about SF88 up, at the
 default 256 MB chunk, q14's `promo_revenue` was wrong while its row count was
 right, so `make bench` merged those rows as `OK`; q8's `mkt_share` broke the
 same way once its aggregate's input spanned two chunks. The rows record no
@@ -274,7 +295,10 @@ format. For every baseline engine (`rapids`, `polars_gpu`, `duckdb_cpu`,
 The engines still read the same rows in the same order (one generator, one
 seed); only each column's encoding and codec differ between them.
 
-**Disk.** Each engine's dataset is about as big as the shared one (the SF5 map's
+**Disk.** `datagen/engine_data.py` (`make engine-data CMD="<cmd> <engine> <SF>"`)
+does the steps below: `need` is the guard, `make` the guard and then ndsgen
+through `dataset.sh` (the SF's dataset and SF1's), `drop` the delete, `status`
+what is on the disk. Each engine's dataset is about as big as the shared one (the SF5 map's
 picks: 0.24-0.31 GB per SF, so 240-310 GB at SF1000), and a box may hold only
 one at a time. So work one (engine, SF) at a time:
 
@@ -290,7 +314,7 @@ one at a time. So work one (engine, SF) at a time:
 3. Delete `$DATA_DIR/<engine>/sf<SF>` when the next (engine, SF) needs the
    space. Never delete the shared `$DATA_DIR/sf<SF>` this way.
 
-TQP-Vortex is exempt: its scan converts every column into its own format
+PageFlow is exempt: its scan converts every column into its own format
 (`IO/parquet_reader.py`, then its codecs), so any parquet with the baselines'
 rows serves it equally, `$DATA_DIR/sf<SF>` or any engine's dataset. Its runs
 (`make bench`'s `tqp_vortex`, the `experiments/` scripts, which read
@@ -304,7 +328,7 @@ What each GPU engine's timed run moves off the GPU, brings back and holds, per
 (scale factor, query). `make spill SF=…` (`SPILL=1 ./run.sh`) runs the bench
 protocol with each engine's instrumentation on, for `rapids`, `polars_gpu` and
 `sirius` (`duckdb_cpu` and the `*_resident` engines are skipped). The
-TQP-Vortex root's `make spill` adds `tqp_vortex` (`../bench/run_tqp.sh`, with
+repository root's `make spill` adds `tqp_vortex` (`../bench/run_tqp.sh`, with
 the same variables). Spill is not deterministic, so the bytes describe the
 pass's own runs. Its times are kept as the `pass_time` kind and never reach
 `all_results.csv`. The pass needs the GPU and the box to itself: memory
@@ -370,7 +394,8 @@ reports them.
 **Reading the numbers across engines.** Each builder's docstring names its
 sources (`rapids/eventlog_stats.py`, `polars/spill_stats.py`,
 `sirius/spill_stats.py`, `../bench/tqp_spill_stats.py`); the collectors'
-design is in `../docs/engine_spill_plan.md` §3. What changes the reading:
+design is in the history (`git show 5d5c441:docs/engine_spill_plan.md`, §3).
+What changes the reading:
 
 - **`rapids`:**
   - Restores are timed, not counted in bytes.
@@ -441,12 +466,12 @@ dataflow cache over a 4 MiB slot pool.
   the bound CPUs (104 here). `--cap-add SYS_NICE` lets Sirius `mbind` its pinned
   pool (Docker's seccomp profile blocks `mbind` without it). `NUMA=off` unbinds;
   `make doctor` checks both. On this box GPUs 0-3 are on node 0, 4-7 on node 1.
-- TQP-Vortex's rules (its `AGENTS.md`) hold for `tqp_vortex`: one `main.py` at a
+- PageFlow's rules (its `AGENTS.md`) hold for `tqp_vortex`: one `main.py` at a
   time on an idle GPU, as its default GPU pool takes the whole card, so
   `../bench/run_tqp.sh` stops if another process holds `TQP_GPU` (default
   `GPU`), and the root `make bench` checks that before any engine runs. That
   bench runs every engine on `GPU` and refuses a `TQP_GPU` that differs.
-  TQP-Vortex's container is not bound to a NUMA node: `main.py` pins its threads
+  PageFlow's container is not bound to a NUMA node: `main.py` pins its threads
   to the GPU's node itself and binds its pinned host pool, about 0.69 GB per SF,
   to that node. A ramdisk copy there would take the pool's memory, so the root
   `make bench` runs `tqp_vortex` after `run.sh` has freed it and refuses

@@ -17,11 +17,10 @@ sirius:
       # block_size*pool_size*initial_number_pools), so startup stays cheap while
       # allowing a large spill tier on this 2 TB box. One host memory space for
       # the box's 2 NUMA nodes (Sirius's log), so this is the total, not per
-      # node (docs/engine_spill_plan.md §3.6). 256 GiB keeps SF1000 off the
-      # disk tier: with the 1.5 GiB hash budget below, at 128 GiB q18 moved
-      # 45 GB host -> disk; at 256 GiB no query did (2026-10-12, plan §10
-      # "SF1000: keeping spill in host memory"). Until then it was 128Gi, and
-      # every Sirius row in all_results.csv up to then used 128Gi.
+      # node. 256 GiB keeps SF1000 off the disk tier: with the 1.5 GiB hash
+      # budget below, at 128 GiB q18 moved 45 GB host -> disk; at 256 GiB no
+      # query did (2026-10-12). Until then it was 128Gi, and every Sirius row in
+      # all_results.csv up to then used 128Gi.
       capacity_bytes: 256Gi
       initial_number_pools: 4           # ~2 GiB pinned at startup, grows as needed
       pool_size: 512
@@ -62,7 +61,6 @@ sirius:
     # 500 MB; Sirius's August defaults made it half the default. At SF1000 it
     # forced q5's lineitem join to partition: 340 GB spilled, 119 s vs 31 s.
     # Every Sirius row in all_results.csv up to this change used 768 MiB.
-    # Details: docs/engine_spill_plan.md §3.6 (repo root).
     max_build_hash_table_bytes: 1610612736
 
   telemetry:

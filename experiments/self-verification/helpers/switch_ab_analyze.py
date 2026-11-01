@@ -2,10 +2,9 @@
 
 Only complete cycles count: a cycle of a qid in which every arm has a time.
 Per query and arm: the median over cycles.  Per arm against the first arm
-(the base): the paired change of each cycle, and for the suite and each
-group the sum of the per-query medians, with a 95% interval from resampling
-each query's cycles (paired cycle bootstrap, docs/sf100-bottleneck-study.md
-§6).  Failed occurrences (no ``query_times.csv`` row) are listed and left
+(the base): the paired change of each cycle, and for the suite the sum of
+the per-query medians, with a 95% interval from resampling
+each query's cycles (paired cycle bootstrap).  Failed occurrences (no ``query_times.csv`` row) are listed and left
 out.
 """
 from __future__ import annotations
@@ -29,12 +28,12 @@ def load(d):
     return [a['name'] for a in cmd['driver']['arms']], recs
 
 
-def cycles(recs, arms, exclude=()):
+def cycles(recs, arms):
     """``({qid: [{arm: time} per complete cycle]}, failed occurrences)``."""
     by = defaultdict(dict)
     failed = []
     for r in recs:
-        if r['warm'] or r['qid'] in exclude:
+        if r['warm']:
             continue
         if r['approx_time'] is None:
             failed.append((r['qid'], r['occ'], r['arm']))
@@ -47,14 +46,10 @@ def cycles(recs, arms, exclude=()):
     return dict(out), failed
 
 
-def summarise(cyc, arms, groups, n_boot=2000, seed=7):
+def summarise(cyc, arms, n_boot=2000, seed=7):
     base = arms[0]
     med = {q: {a: st.median(c[a] for c in cs) for a in arms} for q, cs in cyc.items()}
     sets = {'suite': sorted(cyc)}
-    for name, qs in groups.items():
-        members = [q for q in qs if q in cyc]
-        if members:
-            sets[name] = members
     rnd = random.Random(seed)
     boot = {s: {a: [] for a in arms[1:]} for s in sets}
     for _ in range(n_boot):
@@ -99,13 +94,13 @@ def print_summary(title, res):
                                   for a in arms[1:]))
 
 
-def analyse(d, groups, exclude=(), n_boot=2000):
+def analyse(d, n_boot=2000):
     """Summary of the switch_ab.py output directory ``d`` (raises
     SystemExit when no cycle is complete)."""
     arms, recs = load(d)
-    cyc, failed = cycles(recs, arms, set(exclude))
+    cyc, failed = cycles(recs, arms)
     if not cyc:
         sys.exit(f'{d}: no complete cycle')
-    res = summarise(cyc, arms, groups, n_boot)
+    res = summarise(cyc, arms, n_boot)
     res['failed'] = failed
     return res

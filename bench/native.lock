@@ -729,6 +729,10 @@ nvidia-libnvcomp-cu12==5.2.0.13 \
     --hash=sha256:0fa9e5599cc4a3eb140b8e6dc6e297bd4d2db90a21e2877042bdc320430acd06 \
     --hash=sha256:53fa199e91a0f3530ce713760da23287c204cbcfddb89a11f2c1bb49e24e3c57
     # via libcudf-cu12
+nvidia-ml-py==13.615.71 \
+    --hash=sha256:959bf4adf6fe1308e4bd739e722236b0d1ec8392e2cefad33ff70c311380b9b6 \
+    --hash=sha256:bebe4e48f51b1dc75028c0815cb7bfa14a31a5bb80be70c9d980c6036953fc3d
+    # via -r requirements-dev.txt
 nvidia-nccl-cu12==2.27.3 \
     --hash=sha256:9ddf1a245abc36c550870f26d537a9b6087fb2e2e3d6e0ef03374c6fd19d984f \
     --hash=sha256:adf27ccf4238253e0b826bce3ff5fa532d65fc42322c8bfdfaf28024c0fbe039
